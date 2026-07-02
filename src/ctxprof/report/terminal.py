@@ -1,0 +1,164 @@
+"""Terminal report rendering (Rich)."""
+
+from __future__ import annotations
+
+from rich.console import Console, Group
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
+
+from ctxprof.analysis import AnalysisResult
+
+BAR_WIDTH = 40
+
+
+def _bar(rate: float, max_rate: float, width: int = BAR_WIDTH) -> str:
+    if max_rate <= 0:
+        return ""
+    filled = round(width * rate / max_rate)
+    return "█" * filled
+
+
+def render(result: AnalysisResult, console: Console | None = None) -> None:
+    console = console or Console()
+    curve = result.curve
+
+    console.print()
+    console.print(_headline(result))
+    console.print()
+
+    if curve.total_steps:
+        console.print(_rot_curve_table(result))
+        console.print()
+
+    console.print(_composition_panel(result))
+    console.print()
+
+    if result.prescriptions:
+        console.print(_prescriptions_panel(result))
+        console.print()
+
+    console.print(
+        f"[dim]{len(result.sessions)} sessions · {curve.total_steps} steps analyzed"
+        + (f" · last {result.days} days" if result.days else "")
+        + f" · {result.skipped_sessions} sessions skipped (too short/unreadable)."
+        + " Observational diagnostic, not a controlled experiment —"
+        + " see the methodology docs.[/dim]"
+    )
+
+
+def _headline(result: AnalysisResult) -> Panel:
+    curve = result.curve
+    lines: list[Text] = []
+
+    if curve.degradation_ratio is not None and curve.low_fill_rate is not None:
+        t = Text()
+        t.append("Deep-context failure rate: ", style="bold")
+        t.append(f"{curve.high_fill_rate:.1%}", style="bold red")
+        t.append(" vs ")
+        t.append(f"{curve.low_fill_rate:.1%}", style="bold green")
+        t.append(" in fresh context ")
+        ratio = curve.degradation_ratio
+        ratio_s = "∞" if ratio == float("inf") else f"{ratio:.1f}×"
+        t.append(f"({ratio_s}", style="bold")
+        t.append(
+            ", statistically separated)" if curve.ratio_significant else ", CIs overlap)",
+            style="dim",
+        )
+        lines.append(t)
+    else:
+        lines.append(Text("Not enough steps across fill zones yet for a degradation ratio."))
+
+    if curve.knee_pct is not None:
+        t = Text()
+        t.append("Your degradation threshold: ", style="bold")
+        t.append(f"~{curve.knee_pct}% context fill", style="bold yellow")
+        lines.append(t)
+
+    t = Text()
+    t.append("Est. spend on degraded steps: ", style="bold")
+    t.append(f"${result.rework_cost_usd:.2f}", style="bold red")
+    t.append(f" of ${result.total_cost_usd:.2f} API-equivalent total")
+    lines.append(t)
+
+    return Panel(
+        Group(*lines), title="[bold]ctxprof — your context rot report[/bold]", padding=(1, 2)
+    )
+
+
+def _rot_curve_table(result: AnalysisResult) -> Table:
+    curve = result.curve
+    max_rate = max((b.rate for b in curve.buckets if b.n), default=0.0)
+
+    table = Table(
+        title="Failure-signal rate by context fill",
+        show_edge=False,
+        pad_edge=False,
+    )
+    table.add_column("Fill", justify="right", style="cyan")
+    table.add_column("Rate", justify="right")
+    table.add_column("", min_width=BAR_WIDTH, max_width=BAR_WIDTH)
+    table.add_column("n", justify="right", style="dim")
+    table.add_column("95% CI", justify="right", style="dim")
+
+    for b in curve.buckets:
+        if b.n == 0:
+            continue
+        lo_ci, hi_ci = b.ci
+        past_knee = curve.knee_pct is not None and b.lo >= curve.knee_pct
+        bar_style = "red" if past_knee else "blue"
+        rate_txt = f"{b.rate:.0%}" + ("*" if b.low_confidence else "")
+        table.add_row(
+            f"{b.lo}–{b.hi}%",
+            rate_txt,
+            Text(_bar(b.rate, max_rate), style=bar_style),
+            str(b.n),
+            f"{lo_ci:.0%}–{hi_ci:.0%}",
+        )
+
+    if any(b.low_confidence for b in curve.buckets if b.n):
+        table.caption = "* fewer than 15 steps in bucket — low confidence"
+    return table
+
+
+def _composition_panel(result: AnalysisResult) -> Panel:
+    comp = result.composition
+    rows = [
+        ("Startup overhead", comp.overhead_tokens, "before your first word"),
+        ("Tool outputs", comp.tool_output_tokens, "results flowing into context"),
+        ("Conversation", comp.conversation_tokens, "your messages + agent text"),
+        ("Other growth", comp.other_growth_tokens, "thinking, bookkeeping"),
+    ]
+    rows = [r for r in rows if r[1] > 0]
+    biggest = max((r[1] for r in rows), default=1)
+    table = Table(show_edge=False, show_header=False, pad_edge=False)
+    table.add_column(min_width=17)
+    table.add_column(justify="right")
+    table.add_column(min_width=16, max_width=16)
+    table.add_column(style="dim")
+    for label, tokens, note in rows:
+        share = tokens / biggest
+        bar = Text("█" * max(1, round(16 * share)), style="blue")
+        table.add_row(label, f"{tokens:,}", bar, note)
+    sub = Text(
+        f"Per-session averages (est., chars/4). Startup overhead is "
+        f"{comp.overhead_pct_of_window:.0f}% of your {comp.context_window:,}-token "
+        "window, every session.",
+        style="bold" if comp.overhead_pct_of_window >= 15 else "",
+    )
+    return Panel(
+        Group(table, Text(), sub),
+        title="[bold]Where your context goes (estimated)[/bold]",
+        padding=(1, 2),
+    )
+
+
+def _prescriptions_panel(result: AnalysisResult) -> Panel:
+    lines: list[Text] = []
+    for i, p in enumerate(result.prescriptions, 1):
+        t = Text()
+        t.append(f"{i}. {p.title}\n", style="bold yellow")
+        t.append(f"   {p.detail}\n", style="")
+        t.append(f"   Impact: {p.impact}\n", style="dim")
+        lines.append(t)
+    return Panel(Group(*lines), title="[bold]Prescriptions[/bold]", padding=(1, 2))

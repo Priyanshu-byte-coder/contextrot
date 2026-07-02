@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ctxprof report</title>
+<style>
+  :root {
+    --surface-1: #fcfcfb; --page: #f9f9f7;
+    --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
+    --grid: #e1e0d9; --baseline: #c3c2b7; --ring: rgba(11,11,11,0.10);
+    --series-1: #2a78d6; --series-2: #1baf7a; --series-3: #eda100; --series-4: #008300;
+    --critical: #d03b3b; --warning: #fab219;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #1a1a19; --page: #0d0d0d;
+      --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
+      --grid: #2c2c2a; --baseline: #383835; --ring: rgba(255,255,255,0.10);
+      --series-1: #3987e5; --series-2: #199e70; --series-3: #c98500; --series-4: #008300;
+      --critical: #d03b3b; --warning: #fab219;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--page); color: var(--ink-1);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5; padding: 2rem 1rem; max-width: 60rem; margin: 0 auto;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: .25rem; }
+  h2 { font-size: 1.05rem; margin: 0 0 .75rem; }
+  .sub { color: var(--ink-2); font-size: .9rem; margin-bottom: 1.5rem; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--ring); border-radius: 12px;
+    padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; overflow-x: auto;
+  }
+  .tiles { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+  .tile { flex: 1 1 12rem; }
+  .tile .v { font-size: 2rem; font-weight: 700; }
+  .tile .l { color: var(--ink-2); font-size: .85rem; }
+  .tile .v.bad { color: var(--critical); }
+  svg text { fill: var(--ink-muted); font-size: 11px; font-family: inherit; }
+  svg .val { fill: var(--ink-2); font-weight: 600; }
+  svg .ref-label { fill: var(--critical); font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+  th, td { text-align: right; padding: .3rem .6rem; border-bottom: 1px solid var(--grid); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--ink-2); font-weight: 600; }
+  td { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .rx { margin: 0; padding-left: 1.2rem; }
+  .rx li { margin-bottom: .9rem; }
+  .rx .t { font-weight: 700; }
+  .rx .d { color: var(--ink-2); font-size: .92rem; }
+  .rx .i { color: var(--ink-muted); font-size: .85rem; }
+  .note { color: var(--ink-muted); font-size: .8rem; margin-top: 2rem; }
+  #tip {
+    position: fixed; pointer-events: none; display: none; z-index: 10;
+    background: var(--surface-1); border: 1px solid var(--ring); border-radius: 8px;
+    padding: .4rem .6rem; font-size: .8rem; color: var(--ink-1);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  }
+</style>
+</head>
+<body>
+<h1>ctxprof — context rot report</h1>
+<p class="sub">{{ meta.sessions }} sessions · {{ meta.steps }} steps{% if meta.days %} · last {{ meta.days }} days{% endif %} · generated locally, nothing uploaded</p>
+
+<div class="card tiles">
+  <div class="tile">
+    <div class="v {% if headline.ratio and headline.ratio >= 1.5 %}bad{% endif %}">{{ headline.ratio_str }}</div>
+    <div class="l">deep-context vs fresh-context failure rate ({{ headline.high_rate }} vs {{ headline.low_rate }}){% if not headline.significant %} — CIs overlap{% endif %}</div>
+  </div>
+  <div class="tile">
+    <div class="v">{{ headline.knee_str }}</div>
+    <div class="l">your degradation threshold (context fill)</div>
+  </div>
+  <div class="tile">
+    <div class="v bad">${{ '%.2f' % headline.rework_cost }}</div>
+    <div class="l">est. spend on degraded steps, of ${{ '%.2f' % headline.total_cost }} total (API-equivalent)</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Failure-signal rate by context fill</h2>
+  <svg viewBox="0 0 860 300" width="100%" role="img" aria-label="Bar chart of failure-signal rate per context-fill bucket with 95 percent confidence whiskers">
+    {# y grid #}
+    {% for g in chart.gridlines %}
+    <line x1="60" x2="840" y1="{{ g.y }}" y2="{{ g.y }}" stroke="var(--grid)" stroke-width="1"/>
+    <text x="52" y="{{ g.y + 4 }}" text-anchor="end">{{ g.label }}</text>
+    {% endfor %}
+    {# baseline #}
+    <line x1="60" x2="840" y1="260" y2="260" stroke="var(--baseline)" stroke-width="1"/>
+    {# bars #}
+    {% for b in chart.bars %}
+    <rect class="mark" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="4"
+          fill="{% if b.past_knee %}var(--critical){% else %}var(--series-1){% endif %}"
+          {% if b.low_conf %}opacity="0.55"{% endif %}
+          data-tip="{{ b.tip }}"/>
+    <line x1="{{ b.cx }}" x2="{{ b.cx }}" y1="{{ b.ci_top }}" y2="{{ b.ci_bot }}" stroke="var(--ink-muted)" stroke-width="1.5"/>
+    <text x="{{ b.cx }}" y="275" text-anchor="middle">{{ b.label }}</text>
+    {% if b.show_val %}<text class="val" x="{{ b.cx }}" y="{{ b.y - 8 }}" text-anchor="middle">{{ b.val }}</text>{% endif %}
+    {% endfor %}
+    {# knee reference line #}
+    {% if chart.knee_x %}
+    <line x1="{{ chart.knee_x }}" x2="{{ chart.knee_x }}" y1="20" y2="260" stroke="var(--critical)" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text class="ref-label" x="{{ chart.knee_x + 6 }}" y="30">degradation threshold</text>
+    {% endif %}
+    <text x="450" y="296" text-anchor="middle">context fill (% of {{ '{:,}'.format(meta.window) }}-token window)</text>
+  </svg>
+</div>
+
+<div class="card">
+  <h2>Where your context goes (estimated)</h2>
+  <svg viewBox="0 0 860 {{ comp.height }}" width="100%" role="img" aria-label="Horizontal bar chart of estimated context composition">
+    {% for r in comp.rows %}
+    <text x="0" y="{{ r.y + 13 }}" class="val" text-anchor="start">{{ r.label }}</text>
+    <rect class="mark" x="200" y="{{ r.y }}" width="{{ r.w }}" height="18" rx="4" fill="{{ r.color }}" data-tip="{{ r.tip }}"/>
+    <text x="{{ 208 + r.w }}" y="{{ r.y + 13 }}" text-anchor="start">{{ r.val }}</text>
+    {% endfor %}
+  </svg>
+  <p class="sub" style="margin:0.75rem 0 0">Per-session averages, estimated at 4 chars/token. Startup overhead is <strong>{{ '%.0f' % comp.overhead_pct }}%</strong> of your context window — loaded before your first word, every session.</p>
+</div>
+
+{% if prescriptions %}
+<div class="card">
+  <h2>Prescriptions</h2>
+  <ol class="rx">
+    {% for p in prescriptions %}
+    <li><div class="t">{{ p.title }}</div><div class="d">{{ p.detail }}</div><div class="i">{{ p.impact }}</div></li>
+    {% endfor %}
+  </ol>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Bucket data</h2>
+  <table>
+    <thead><tr><th>Fill</th><th>Steps</th><th>Degraded</th><th>Rate</th><th>95% CI</th>
+      <th>Tool err</th><th>Edit fail</th><th>Retry</th><th>Re-read</th><th>Self-corr</th></tr></thead>
+    <tbody>
+      {% for b in table_rows %}
+      <tr><td>{{ b.range }}</td><td>{{ b.n }}</td><td>{{ b.degraded }}</td><td>{{ b.rate }}</td><td>{{ b.ci }}</td>
+        <td>{{ b.tool_error }}</td><td>{{ b.edit_failure }}</td><td>{{ b.retry }}</td><td>{{ b.reread }}</td><td>{{ b.self_correction }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<p class="note">Observational diagnostic computed locally from your own agent transcripts — not a controlled experiment.
+Rates are failure-signal frequencies with Wilson 95% intervals; composition figures are estimates.
+Generated by ctxprof v{{ meta.version }}.</p>
+
+<div id="tip"></div>
+<script>
+(function () {
+  var tip = document.getElementById('tip');
+  document.querySelectorAll('.mark').forEach(function (el) {
+    el.addEventListener('mousemove', function (e) {
+      tip.textContent = el.getAttribute('data-tip');
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX + 14) + 'px';
+      tip.style.top = (e.clientY + 14) + 'px';
+    });
+    el.addEventListener('mouseleave', function () { tip.style.display = 'none'; });
+  });
+})();
+</script>
+</body>
+</html>
