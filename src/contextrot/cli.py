@@ -46,6 +46,16 @@ Window = Annotated[
 ]
 
 
+def _project_basename(project: str) -> str:
+    """Last path component, tolerant of both separators.
+
+    Transcripts record the project as the agent's working directory, which
+    may be a Windows path even when contextrot runs elsewhere (shared
+    fixtures, copied transcript dirs) — so os.path can't be trusted here.
+    """
+    return project.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1] or project
+
+
 def _finite_or_none(value: float | None) -> float | None:
     if value is None or value == float("inf"):
         return None
@@ -154,7 +164,7 @@ def sessions(
     for s in found:
         started = s.started_at.strftime("%Y-%m-%d %H:%M") if s.started_at else "?"
         model = s.steps[0].model if s.steps else "?"
-        project_name = Path(s.project).name if s.project else "?"
+        project_name = _project_basename(s.project) if s.project else "?"
         table.add_row(
             started, project_name, str(len(s.steps)), f"{s.peak_prompt_tokens:,}", model
         )
