@@ -2,7 +2,7 @@
 
 **Your coding agent gets worse as its context fills. ctxprof proves it on your own sessions — and tells you exactly what to change.**
 
-[![CI](https://github.com/priyanshudoshi/ctxprof/actions/workflows/ci.yml/badge.svg)](https://github.com/priyanshudoshi/ctxprof/actions/workflows/ci.yml)
+[![CI](https://github.com/Priyanshu-byte-coder/ctxprof/actions/workflows/ci.yml/badge.svg)](https://github.com/Priyanshu-byte-coder/ctxprof/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/ctxprof)](https://pypi.org/project/ctxprof/)
 [![Python](https://img.shields.io/pypi/pyversions/ctxprof)](https://pypi.org/project/ctxprof/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

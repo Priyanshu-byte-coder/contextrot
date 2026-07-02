@@ -30,7 +30,7 @@ Wanted adapters: Codex CLI, OpenCode, Gemini CLI, OpenClaw, Cursor CLI, OpenTele
 ## Development setup
 
 ```bash
-git clone https://github.com/priyanshudoshi/ctxprof
+git clone https://github.com/Priyanshu-byte-coder/ctxprof
 cd ctxprof
 pip install -e ".[dev]"
 pytest

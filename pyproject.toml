@@ -37,9 +37,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/priyanshudoshi/ctxprof"
-Repository = "https://github.com/priyanshudoshi/ctxprof"
-Issues = "https://github.com/priyanshudoshi/ctxprof/issues"
+Homepage = "https://github.com/Priyanshu-byte-coder/ctxprof"
+Repository = "https://github.com/Priyanshu-byte-coder/ctxprof"
+Issues = "https://github.com/Priyanshu-byte-coder/ctxprof/issues"
 
 [project.scripts]
 ctxprof = "ctxprof.cli:app"
