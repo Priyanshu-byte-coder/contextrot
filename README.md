@@ -11,6 +11,7 @@
   <a href="https://pypi.org/project/contextrot/"><img src="https://img.shields.io/pypi/v/contextrot?color=2a78d6" alt="PyPI version"></a>
   <a href="https://pypi.org/project/contextrot/"><img src="https://img.shields.io/pypi/pyversions/contextrot?color=2a78d6" alt="Python versions"></a>
   <a href="https://github.com/Priyanshu-byte-coder/contextrot/actions/workflows/ci.yml"><img src="https://github.com/Priyanshu-byte-coder/contextrot/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pepy.tech/projects/contextrot"><img src="https://static.pepy.tech/badge/contextrot" alt="Downloads"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2a78d6" alt="License: MIT"></a>
 </p>
 
@@ -24,25 +25,9 @@ That's it. No config, no API keys, no uploads. contextrot reads the session tran
 
 > **At what context fill does *my* agent start failing, what's causing it, and what is it costing me?**
 
-```
-┌─────────────────── contextrot — your context rot report ────────────────────┐
-│                                                                             │
-│  ✗ Context rot detected: your agent fails 2.1× more often in deep context.  │
-│                                                                             │
-│  Deep-context failure rate: 31.4% vs 14.9% in fresh context                 │
-│  Your degradation threshold: ~60% context fill                              │
-│  Token value burned in degraded steps: $23.40 of $148.02 total              │
-│                                                                             │
-└──────────────────────────────────────────────────────────────────────────────┘
-
-                   Failure-signal rate by context fill
-   Fill │ Rate │                                          │    n │ 95% CI
- 10–20% │  12% │ ███████████                              │  308 │  9%–16%
- 20–30% │  14% │ █████████████                            │  257 │ 10%–18%
- 40–50% │  16% │ ███████████████                          │  198 │ 12%–21%
- 60–70% │  29% │ ███████████████████████████              │  121 │ 22%–37%
- 70–80% │  34% │ ████████████████████████████████         │   87 │ 25%–44%
-```
+<div align="center">
+  <img src="https://raw.githubusercontent.com/Priyanshu-byte-coder/contextrot/main/assets/screenshot.png" alt="contextrot terminal report: verdict, rot curve by context fill with confidence intervals, context composition, and prescriptions" width="900">
+</div>
 
 Every report leads with a plain verdict — one of four honest answers:
 
