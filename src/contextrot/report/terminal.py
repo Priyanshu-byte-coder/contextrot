@@ -47,9 +47,26 @@ def render(result: AnalysisResult, console: Console | None = None) -> None:
     )
 
 
+_VERDICT_STYLE = {
+    "rot": "bold red",
+    "edge": "bold yellow",
+    "clean": "bold green",
+    "insufficient": "bold yellow",
+}
+_VERDICT_ICON = {"rot": "✗ ", "edge": "! ", "clean": "✓ ", "insufficient": "? "}
+
+
 def _headline(result: AnalysisResult) -> Panel:
     curve = result.curve
     lines: list[Text] = []
+
+    lines.append(
+        Text(
+            _VERDICT_ICON[result.verdict_kind] + result.verdict_text,
+            style=_VERDICT_STYLE[result.verdict_kind],
+        )
+    )
+    lines.append(Text())
 
     if curve.degradation_ratio is not None and curve.low_fill_rate is not None:
         t = Text()
@@ -62,18 +79,21 @@ def _headline(result: AnalysisResult) -> Panel:
         ratio_s = "∞" if ratio == float("inf") else f"{ratio:.1f}×"
         t.append(f"({ratio_s}", style="bold")
         t.append(
-            ", statistically separated)" if curve.ratio_significant else ", CIs overlap)",
+            ", statistically significant)"
+            if curve.ratio_significant
+            else ", within statistical noise)",
             style="dim",
         )
         lines.append(t)
-    else:
-        lines.append(Text("Not enough steps across fill zones yet for a degradation ratio."))
 
+    t = Text()
+    t.append("Your degradation threshold: ", style="bold")
     if curve.knee_pct is not None:
-        t = Text()
-        t.append("Your degradation threshold: ", style="bold")
         t.append(f"~{curve.knee_pct}% context fill", style="bold yellow")
-        lines.append(t)
+    else:
+        t.append("none found", style="green")
+        t.append(" (failure rate doesn't climb with fill)", style="dim")
+    lines.append(t)
 
     t = Text()
     t.append("Est. spend on degraded steps: ", style="bold")

@@ -9,7 +9,7 @@ from pathlib import Path
 from contextrot.adapters import ADAPTERS
 from contextrot.analysis.composition import Composition, estimate_composition
 from contextrot.analysis.prescriptions import Prescription, prescribe
-from contextrot.analysis.rot import RotCurve, build_rot_curve
+from contextrot.analysis.rot import RotCurve, build_rot_curve, verdict
 from contextrot.models import Session
 from contextrot.pricing import DEFAULT_CONTEXT_WINDOW, context_window_for
 from contextrot.signals import StepSignals, extract_signals
@@ -29,6 +29,8 @@ class AnalysisResult:
     days: int | None
     skipped_sessions: int = 0
     signal_rates: dict[str, float] = field(default_factory=dict)
+    verdict_kind: str = "insufficient"
+    verdict_text: str = ""
 
 
 def load_sessions(
@@ -89,6 +91,7 @@ def analyze(
 
     n = max(len(all_steps), 1)
     signal_rates = {name: count / n for name, count in curve.signal_totals.items()}
+    v_kind, v_text = verdict(curve)
 
     return AnalysisResult(
         sessions=sessions,
@@ -103,4 +106,6 @@ def analyze(
         days=days,
         skipped_sessions=skipped,
         signal_rates=signal_rates,
+        verdict_kind=v_kind,
+        verdict_text=v_text,
     )

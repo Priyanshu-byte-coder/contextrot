@@ -1,4 +1,4 @@
-from contextrot.analysis.rot import build_rot_curve, wilson_interval
+from contextrot.analysis.rot import build_rot_curve, verdict, wilson_interval
 from contextrot.signals import StepSignals
 
 
@@ -46,6 +46,36 @@ def test_small_buckets_marked_low_confidence():
     bucket = curve.buckets[-1]
     assert bucket.n == 3
     assert bucket.low_confidence
+
+
+def test_verdict_rot():
+    steps = [_step(15.0, i % 20 == 0) for i in range(200)]
+    steps += [_step(75.0, i % 5 < 2) for i in range(200)]
+    kind, text = verdict(build_rot_curve(steps))
+    assert kind == "rot"
+    assert "8.0×" in text
+
+
+def test_verdict_clean_on_flat_curve():
+    steps = [_step(f, i % 10 == 0) for i, f in enumerate([15.0, 75.0] * 200)]
+    kind, text = verdict(build_rot_curve(steps))
+    assert kind == "clean"
+
+
+def test_verdict_edge_when_only_extreme_fill_degrades():
+    # Flat 5% failure everywhere except 90-100% fill, where it's 40%.
+    steps = [_step(f, i % 20 == 0) for i, f in enumerate([15.0, 75.0] * 200)]
+    steps += [_step(95.0, i % 5 < 2) for i in range(100)]
+    curve = build_rot_curve(steps)
+    kind, text = verdict(curve)
+    assert kind == "edge"
+    assert "~90%" in text
+
+
+def test_verdict_insufficient_on_small_sample():
+    steps = [_step(15.0, False) for _ in range(10)] + [_step(75.0, True) for _ in range(10)]
+    kind, _ = verdict(build_rot_curve(steps))
+    assert kind == "insufficient"
 
 
 def test_empty_input():

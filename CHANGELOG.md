@@ -4,6 +4,18 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.1.1] - 2026-07-03
+
+### Added
+
+- Plain-language verdict line ("rot detected" / "no measurable rot" / "not enough data") leading every report — terminal, HTML, and JSON
+- Explicit "degradation threshold: none found" reporting for flat curves
+
+### Fixed
+
+- `sessions` table now shows the project basename on Linux/macOS for transcripts recorded on Windows
+- Statistical wording made readable ("within statistical noise" instead of "CIs overlap")
+
 ## [0.1.0] - 2026-07-02
 
 ### Added

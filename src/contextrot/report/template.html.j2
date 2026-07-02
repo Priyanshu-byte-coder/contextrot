@@ -10,7 +10,7 @@
     --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
     --grid: #e1e0d9; --baseline: #c3c2b7; --ring: rgba(11,11,11,0.10);
     --series-1: #2a78d6; --series-2: #1baf7a; --series-3: #eda100; --series-4: #008300;
-    --critical: #d03b3b; --warning: #fab219;
+    --critical: #d03b3b; --warning: #fab219; --good: #006300;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -18,7 +18,7 @@
       --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
       --grid: #2c2c2a; --baseline: #383835; --ring: rgba(255,255,255,0.10);
       --series-1: #3987e5; --series-2: #199e70; --series-3: #c98500; --series-4: #008300;
-      --critical: #d03b3b; --warning: #fab219;
+      --critical: #d03b3b; --warning: #fab219; --good: #0ca30c;
     }
   }
   * { box-sizing: border-box; margin: 0; }
@@ -39,6 +39,11 @@
   .tile .v { font-size: 2rem; font-weight: 700; }
   .tile .l { color: var(--ink-2); font-size: .85rem; }
   .tile .v.bad { color: var(--critical); }
+  .verdict { font-weight: 700; font-size: 1.05rem; }
+  .verdict.rot { color: var(--critical); }
+  .verdict.clean { color: var(--good); }
+  .verdict.edge { color: var(--warning); }
+  .verdict.insufficient { color: var(--warning); }
   svg text { fill: var(--ink-muted); font-size: 11px; font-family: inherit; }
   svg .val { fill: var(--ink-2); font-weight: 600; }
   svg .ref-label { fill: var(--critical); font-weight: 600; }
@@ -64,6 +69,10 @@
 <body>
 <h1>contextrot — context rot report</h1>
 <p class="sub">{{ meta.sessions }} sessions · {{ meta.steps }} steps{% if meta.days %} · last {{ meta.days }} days{% endif %} · generated locally, nothing uploaded</p>
+
+<div class="card">
+  <p class="verdict {{ headline.verdict_kind }}">{{ headline.verdict_icon }} {{ headline.verdict_text }}</p>
+</div>
 
 <div class="card tiles">
   <div class="tile">

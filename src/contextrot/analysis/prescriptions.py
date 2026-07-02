@@ -29,14 +29,14 @@ def prescribe(
 ) -> list[Prescription]:
     out: list[Prescription] = []
 
-    if curve.knee_pct is not None and curve.high_fill_rate and curve.low_fill_rate:
+    if curve.knee_pct is not None and curve.low_fill_rate:
+        knee_rate, _ = curve.rate_at_or_above(curve.knee_pct)
         out.append(
             Prescription(
                 title=f"Compact or restart sessions before ~{curve.knee_pct}% context fill",
                 detail=(
-                    f"Your failure-signal rate rises from "
-                    f"{curve.low_fill_rate:.1%} below {int(curve.knee_pct)}% fill to "
-                    f"{curve.high_fill_rate:.1%} in deep context. "
+                    f"Your failure-signal rate is {curve.low_fill_rate:.1%} in fresh "
+                    f"context but {knee_rate:.1%} past {int(curve.knee_pct)}% fill. "
                     f"{steps_past_knee} of your recent steps ran past that threshold."
                 ),
                 impact=(
@@ -77,7 +77,7 @@ def prescribe(
                     "narrower searches, and quieter commands over dumping whole files "
                     "and logs into the window."
                 ),
-                impact="Slower fill means more steps before the degradation zone.",
+                impact="Slower fill means more working room before deep-context territory.",
                 priority=3,
             )
         )

@@ -42,7 +42,11 @@ def _context(result: AnalysisResult) -> dict:
     else:
         ratio_str = f"{ratio:.1f}×"
 
+    icons = {"rot": "✗", "edge": "!", "clean": "✓", "insufficient": "?"}
     headline = {
+        "verdict_kind": result.verdict_kind,
+        "verdict_text": result.verdict_text,
+        "verdict_icon": icons.get(result.verdict_kind, ""),
         "ratio": None if ratio in (None, float("inf")) else ratio,
         "ratio_str": ratio_str,
         "high_rate": f"{curve.high_fill_rate:.1%}" if curve.high_fill_rate is not None else "n/a",

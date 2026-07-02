@@ -70,6 +70,55 @@ class RotCurve:
     def overall_rate(self) -> float:
         return self.total_degraded / self.total_steps if self.total_steps else 0.0
 
+    def rate_at_or_above(self, pct: int) -> tuple[float, int]:
+        """(degraded rate, n) across all buckets starting at or above pct fill."""
+        n = sum(b.n for b in self.buckets if b.lo >= pct)
+        d = sum(b.degraded for b in self.buckets if b.lo >= pct)
+        return (d / n if n else 0.0, n)
+
+
+# Minimum steps per zone before the tool is willing to state a verdict.
+VERDICT_MIN_N = 150
+# Ratio below which a significant difference still isn't worth alarming over.
+VERDICT_MIN_RATIO = 1.3
+
+
+def verdict(curve: RotCurve) -> tuple[str, str]:
+    """Plain-language interpretation of the curve.
+
+    Returns (kind, text) where kind is one of "rot", "edge", "clean",
+    "insufficient". This is the first line a user reads; it must never
+    require knowing what a confidence interval is.
+    """
+    if curve.low_fill_n < VERDICT_MIN_N or curve.high_fill_n < VERDICT_MIN_N:
+        return (
+            "insufficient",
+            "Not enough data for a verdict yet — keep using your agent and re-run "
+            f"(need ~{VERDICT_MIN_N} steps in both fresh and deep context).",
+        )
+    ratio = curve.degradation_ratio
+    if curve.ratio_significant and ratio is not None and ratio >= VERDICT_MIN_RATIO:
+        ratio_s = "sharply" if ratio == float("inf") else f"{ratio:.1f}× more often"
+        return (
+            "rot",
+            f"Context rot detected: your agent fails {ratio_s} in deep context. "
+            "See prescriptions below.",
+        )
+    if curve.knee_pct is not None:
+        knee_rate, _ = curve.rate_at_or_above(curve.knee_pct)
+        low = curve.low_fill_rate or 0.0
+        return (
+            "edge",
+            f"Context rot only near the window limit: past ~{curve.knee_pct}% fill "
+            f"your failure rate is {knee_rate:.1%} vs {low:.1%} below it — flat "
+            f"until then. Compact or restart before ~{curve.knee_pct}%.",
+        )
+    return (
+        "clean",
+        "No measurable context rot in your sessions — your failure rate stays "
+        "flat as context fills. Your setup is working.",
+    )
+
 
 def build_rot_curve(steps: list[StepSignals]) -> RotCurve:
     buckets = [Bucket(lo, lo + BUCKET_WIDTH) for lo in range(0, 100, BUCKET_WIDTH)]
@@ -113,7 +162,10 @@ def build_rot_curve(steps: list[StepSignals]) -> RotCurve:
         for b in buckets:
             if b.lo < LOW_FILL_MAX or b.low_confidence:
                 continue
-            if b.rate >= KNEE_RATIO * low_rate:
+            # Both conditions required: the point estimate is meaningfully
+            # elevated AND the bucket's CI floor clears the fresh-zone rate,
+            # so a single noisy bucket can't declare a threshold.
+            if b.rate >= KNEE_RATIO * low_rate and b.ci[0] > low_rate:
                 knee = b.lo
                 break
 

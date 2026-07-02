@@ -101,6 +101,7 @@ def main(
     if as_json:
         payload = {
             "version": __version__,
+            "verdict": {"kind": result.verdict_kind, "text": result.verdict_text},
             "sessions": len(result.sessions),
             "steps": [s.as_dict() for s in result.steps],
             "curve": {
