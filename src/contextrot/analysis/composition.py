@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ctxprof.models import Session
+from contextrot.models import Session
 
 CHARS_PER_TOKEN = 4
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from ctxprof.signals import SIGNAL_NAMES, StepSignals
+from contextrot.signals import SIGNAL_NAMES, StepSignals
 
 BUCKET_WIDTH = 10  # percent
 LOW_FILL_MAX = 40.0  # "fresh context" zone

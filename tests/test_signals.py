@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from ctxprof.adapters.claude_code import ClaudeCodeAdapter
-from ctxprof.signals import extract_signals
+from contextrot.adapters.claude_code import ClaudeCodeAdapter
+from contextrot.signals import extract_signals
 
 SESSION_FILE = (
     Path(__file__).parent / "fixtures" / "demo-project"

@@ -5,8 +5,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: ctxprof version
-      placeholder: "0.1.0 (ctxprof --version)"
+      label: contextrot version
+      placeholder: "0.1.0 (contextrot --version)"
     validations:
       required: true
   - type: input

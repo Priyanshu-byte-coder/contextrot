@@ -23,7 +23,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from ctxprof.models import Session
+from contextrot.models import Session
 
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit", "str_replace_editor", "apply_patch"}
 READ_TOOLS = {"Read", "NotebookRead"}
@@ -89,7 +89,7 @@ class SessionSignals:
 
 
 def extract_signals(session: Session, context_window: int) -> SessionSignals:
-    from ctxprof.pricing import step_cost_usd
+    from contextrot.pricing import step_cost_usd
 
     out = SessionSignals(session=session)
     # (tool, target) pairs that errored, mapped to the step index of the error.

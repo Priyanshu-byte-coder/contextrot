@@ -7,7 +7,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from ctxprof.analysis import AnalysisResult
+from contextrot.analysis import AnalysisResult
 
 BAR_WIDTH = 40
 
@@ -82,7 +82,7 @@ def _headline(result: AnalysisResult) -> Panel:
     lines.append(t)
 
     return Panel(
-        Group(*lines), title="[bold]ctxprof — your context rot report[/bold]", padding=(1, 2)
+        Group(*lines), title="[bold]contextrot — your context rot report[/bold]", padding=(1, 2)
     )
 
 

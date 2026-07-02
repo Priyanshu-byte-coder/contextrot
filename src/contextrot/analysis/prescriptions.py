@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ctxprof.analysis.composition import Composition
-from ctxprof.analysis.rot import RotCurve
+from contextrot.analysis.composition import Composition
+from contextrot.analysis.rot import RotCurve
 
 
 @dataclass

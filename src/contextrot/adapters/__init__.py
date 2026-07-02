@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ctxprof.adapters.base import SessionAdapter
-from ctxprof.adapters.claude_code import ClaudeCodeAdapter
+from contextrot.adapters.base import SessionAdapter
+from contextrot.adapters.claude_code import ClaudeCodeAdapter
 
 ADAPTERS: dict[str, SessionAdapter] = {
     ClaudeCodeAdapter.name: ClaudeCodeAdapter(),

@@ -16,4 +16,4 @@ All notable changes to this project are documented here. Format follows
 - Cost accounting per step with per-model pricing; cost-of-degraded-steps estimate
 - Quantified prescriptions engine
 - Terminal report (Rich), self-contained HTML report (inline SVG, dark mode, tooltips, data table), `--json` output
-- `ctxprof sessions` listing command
+- `contextrot sessions` listing command

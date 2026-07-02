@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from ctxprof.adapters.claude_code import ClaudeCodeAdapter
+from contextrot.adapters.claude_code import ClaudeCodeAdapter
 
 FIXTURES = Path(__file__).parent / "fixtures"
 SESSION_FILE = FIXTURES / "demo-project" / "11111111-2222-3333-4444-555555555555.jsonl"

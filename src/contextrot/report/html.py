@@ -10,8 +10,8 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from ctxprof import __version__
-from ctxprof.analysis import AnalysisResult
+from contextrot import __version__
+from contextrot.analysis import AnalysisResult
 
 # Chart geometry (viewBox units)
 _PLOT_X0, _PLOT_X1 = 60, 840

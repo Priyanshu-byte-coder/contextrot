@@ -24,8 +24,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from ctxprof.adapters.base import SessionAdapter
-from ctxprof.models import Session, Step, ToolCall
+from contextrot.adapters.base import SessionAdapter
+from contextrot.models import Session, Step, ToolCall
 
 # Tool input keys used as the retry/re-read "target", in priority order.
 _TARGET_KEYS = ("file_path", "path", "url", "pattern", "command", "query")

@@ -6,13 +6,13 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from ctxprof.adapters import ADAPTERS
-from ctxprof.analysis.composition import Composition, estimate_composition
-from ctxprof.analysis.prescriptions import Prescription, prescribe
-from ctxprof.analysis.rot import RotCurve, build_rot_curve
-from ctxprof.models import Session
-from ctxprof.pricing import DEFAULT_CONTEXT_WINDOW, context_window_for
-from ctxprof.signals import StepSignals, extract_signals
+from contextrot.adapters import ADAPTERS
+from contextrot.analysis.composition import Composition, estimate_composition
+from contextrot.analysis.prescriptions import Prescription, prescribe
+from contextrot.analysis.rot import RotCurve, build_rot_curve
+from contextrot.models import Session
+from contextrot.pricing import DEFAULT_CONTEXT_WINDOW, context_window_for
+from contextrot.signals import StepSignals, extract_signals
 
 
 @dataclass

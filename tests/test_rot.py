@@ -1,5 +1,5 @@
-from ctxprof.analysis.rot import build_rot_curve, wilson_interval
-from ctxprof.signals import StepSignals
+from contextrot.analysis.rot import build_rot_curve, wilson_interval
+from contextrot.signals import StepSignals
 
 
 def _step(fill: float, degraded: bool) -> StepSignals:

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from ctxprof.cli import app
+from contextrot.cli import app
 
 FIXTURES = Path(__file__).parent / "fixtures"
 runner = CliRunner()
@@ -35,7 +35,7 @@ def test_html_report_written(tmp_path: Path):
     assert result.exit_code == 0
     html = out.read_text(encoding="utf-8")
     assert "<svg" in html
-    assert "ctxprof" in html
+    assert "contextrot" in html
     # Self-contained: no external resources.
     assert "http://" not in html
     assert 'src="https' not in html and 'href="https' not in html

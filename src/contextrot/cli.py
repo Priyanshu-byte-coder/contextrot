@@ -1,4 +1,4 @@
-"""ctxprof command-line interface."""
+"""contextrot command-line interface."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from ctxprof import __version__
-from ctxprof.analysis import analyze, load_sessions
+from contextrot import __version__
+from contextrot.analysis import analyze, load_sessions
 
 # Windows consoles often default to a legacy codepage that can't encode the
 # box-drawing characters Rich uses; force UTF-8 where the stream supports it.
@@ -23,7 +23,7 @@ for _stream in (sys.stdout, sys.stderr):
             _stream.reconfigure(encoding="utf-8", errors="replace")
 
 app = typer.Typer(
-    name="ctxprof",
+    name="contextrot",
     help=(
         "Find out where your coding agent starts degrading. "
         "Analyzes agent transcripts already on your disk — nothing is uploaded."
@@ -54,7 +54,7 @@ def _finite_or_none(value: float | None) -> float | None:
 
 def _version_callback(value: bool) -> None:
     if value:
-        console.print(f"ctxprof {__version__}")
+        console.print(f"contextrot {__version__}")
         raise typer.Exit()
 
 
@@ -83,7 +83,7 @@ def main(
     if not result.sessions:
         console.print(
             "[yellow]No agent sessions found.[/yellow] "
-            "ctxprof currently reads Claude Code transcripts from ~/.claude/projects. "
+            "contextrot currently reads Claude Code transcripts from ~/.claude/projects. "
             "Point elsewhere with --data-dir, or widen the range with --days."
         )
         raise typer.Exit(code=1)
@@ -121,12 +121,12 @@ def main(
         }
         print(json.dumps(payload, indent=2))
     else:
-        from ctxprof.report import render
+        from contextrot.report import render
 
         render(result, console)
 
     if html is not None:
-        from ctxprof.report import render_html
+        from contextrot.report import render_html
 
         out = render_html(result, html)
         console.print(f"[green]HTML report written:[/green] {out}")
