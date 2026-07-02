@@ -1,0 +1,38 @@
+name: Bug report
+description: Something broke or produced wrong output
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: ctxprof version
+      placeholder: "0.1.0 (ctxprof --version)"
+    validations:
+      required: true
+  - type: input
+    id: agent
+    attributes:
+      label: Agent CLI and version
+      placeholder: "Claude Code 2.1.92"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: "Windows 11 / macOS 15 / Ubuntu 24.04"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Command you ran, what you expected, what you got. Paste tracebacks in full.
+    validations:
+      required: true
+  - type: textarea
+    id: transcript
+    attributes:
+      label: Sanitized transcript snippet (parsing bugs only)
+      description: >
+        If parsing failed, paste the offending JSONL line(s) with file paths,
+        code, and personal data replaced by placeholders. Never paste raw
+        transcript content.

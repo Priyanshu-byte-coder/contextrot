@@ -1,0 +1,29 @@
+name: Adapter request
+description: Ask for (or offer to build) support for another agent CLI
+labels: [adapter, good-first-issue]
+body:
+  - type: input
+    id: agent
+    attributes:
+      label: Agent CLI
+      placeholder: "Codex CLI / OpenCode / Gemini CLI / ..."
+    validations:
+      required: true
+  - type: input
+    id: location
+    attributes:
+      label: Where transcripts live on disk
+      placeholder: "~/.codex/sessions/*.jsonl"
+  - type: textarea
+    id: format
+    attributes:
+      label: Format notes
+      description: >
+        Anything you know about the file format — a sanitized sample entry is
+        gold. See CONTRIBUTING.md if you want to build it yourself (it's one file).
+  - type: checkboxes
+    id: build
+    attributes:
+      label: Willing to build it?
+      options:
+        - label: I'd like to implement this adapter myself with guidance
