@@ -127,6 +127,7 @@ def main(
             "cost": {
                 "total_usd": round(result.total_cost_usd, 2),
                 "rework_usd": round(result.rework_cost_usd, 2),
+                "pricing_basis": "api_list_prices",
             },
             "prescriptions": [vars(p) for p in result.prescriptions],
         }

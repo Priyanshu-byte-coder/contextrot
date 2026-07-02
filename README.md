@@ -1,41 +1,61 @@
-# contextrot
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Priyanshu-byte-coder/contextrot/main/assets/logo_dark.png">
+    <img src="https://raw.githubusercontent.com/Priyanshu-byte-coder/contextrot/main/assets/logo_white.png" alt="contextrot logo" width="200" height="200">
+  </picture>
+  <h1>contextrot</h1>
+  <p><strong>Your coding agent gets worse as its context fills.<br>contextrot proves it on your own sessions — and tells you exactly what to change.</strong></p>
+</div>
 
-**Your coding agent gets worse as its context fills. contextrot proves it on your own sessions — and tells you exactly what to change.**
+<p align="center">
+  <a href="https://pypi.org/project/contextrot/"><img src="https://img.shields.io/pypi/v/contextrot?color=2a78d6" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/contextrot/"><img src="https://img.shields.io/pypi/pyversions/contextrot?color=2a78d6" alt="Python versions"></a>
+  <a href="https://github.com/Priyanshu-byte-coder/contextrot/actions/workflows/ci.yml"><img src="https://github.com/Priyanshu-byte-coder/contextrot/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2a78d6" alt="License: MIT"></a>
+</p>
 
-[![CI](https://github.com/Priyanshu-byte-coder/contextrot/actions/workflows/ci.yml/badge.svg)](https://github.com/Priyanshu-byte-coder/contextrot/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/contextrot)](https://pypi.org/project/contextrot/)
-[![Python](https://img.shields.io/pypi/pyversions/contextrot)](https://pypi.org/project/contextrot/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+## Quick start
 
-```
+```bash
 uvx contextrot
 ```
 
-No config. No API keys. No uploads. contextrot reads the agent transcripts already sitting on your disk and answers a question no other tool answers:
+That's it. No config, no API keys, no uploads. contextrot reads the session transcripts your agent CLI already keeps on disk and answers a question no other tool answers:
 
 > **At what context fill does *my* agent start failing, what's causing it, and what is it costing me?**
 
 ```
-╭──────────────── contextrot — your context rot report ────────────────╮
-│                                                                    │
-│  Deep-context failure rate: 31.4% vs 14.9% in fresh context        │
-│  (2.1×, statistically separated)                                   │
-│  Your degradation threshold: ~60% context fill                     │
-│  Est. spend on degraded steps: $23.40 of $148.02 total             │
-│                                                                    │
-╰────────────────────────────────────────────────────────────────────╯
+┌─────────────────── contextrot — your context rot report ────────────────────┐
+│                                                                             │
+│  ✗ Context rot detected: your agent fails 2.1× more often in deep context.  │
+│                                                                             │
+│  Deep-context failure rate: 31.4% vs 14.9% in fresh context                 │
+│  Your degradation threshold: ~60% context fill                              │
+│  Token value burned in degraded steps: $23.40 of $148.02 total              │
+│                                                                             │
+└──────────────────────────────────────────────────────────────────────────────┘
 
-           Failure-signal rate by context fill
-   Fill    Rate                                            n   95% CI
-  0–10%     9%  ████████                                 214   6%–13%
- 10–20%    12%  ███████████                              308   9%–16%
- 20–30%    14%  █████████████                            257  10%–18%
- ...
- 60–70%    29%  ███████████████████████████              121  22%–37%
- 70–80%    34%  ████████████████████████████████          87  25%–44%
+                   Failure-signal rate by context fill
+   Fill │ Rate │                                          │    n │ 95% CI
+ 10–20% │  12% │ ███████████                              │  308 │  9%–16%
+ 20–30% │  14% │ █████████████                            │  257 │ 10%–18%
+ 40–50% │  16% │ ███████████████                          │  198 │ 12%–21%
+ 60–70% │  29% │ ███████████████████████████              │  121 │ 22%–37%
+ 70–80% │  34% │ ████████████████████████████████         │   87 │ 25%–44%
 ```
 
-## What "context rot" is — and why a benchmark can't tell you
+Every report leads with a plain verdict — one of four honest answers:
+
+| Verdict | Meaning |
+|---|---|
+| ✗ **Context rot detected** | your failure rate climbs significantly as context fills |
+| ! **Edge rot** | flat until near the window limit, then it climbs — compact before you get there |
+| ✓ **No measurable rot** | your failure rate stays flat; your setup is working |
+| ? **Not enough data** | keep using your agent and re-run |
+
+A tool that can say "you're fine" is a tool you can trust when it says you're not.
+
+## Why a benchmark can't tell you this
 
 Research ([Chroma's context-rot report](https://www.trychroma.com/research/context-rot), several 2026 papers) shows LLM output quality degrades as input context grows — even far below the window limit. But that research runs synthetic tasks in lab conditions. Your degradation point depends on *your* projects, *your* MCP setup, *your* model, *your* prompting style.
 
@@ -43,59 +63,73 @@ contextrot measures it where it actually matters: in your own sessions.
 
 ## How it works
 
-Agent CLIs like Claude Code log every session to local JSONL transcripts. Each step in those transcripts carries token accounting *and* behavioral evidence:
+Agent CLIs like Claude Code log every session to local JSONL transcripts. Each step carries token accounting *and* behavioral evidence. contextrot extracts five independent failure signals per step and correlates them with context fill at that moment:
 
-- **edit failures** — the agent tried to edit code and missed
-- **retry loops** — the same tool call repeated after an error
-- **re-reads** — the agent re-reading files it already read (it lost track)
-- **self-corrections** — "I apologize, let me fix that"
-- **tool errors** — any failed tool call
+| Signal | What it catches |
+|---|---|
+| **Edit failures** | the agent tried to edit code and missed — the clearest "lost track of file state" event |
+| **Retry loops** | the same tool call repeated after an error: paying twice for one action |
+| **Re-reads** | re-reading files it already read — content scrolled out of effective attention |
+| **Self-corrections** | "I apologize, let me fix that" |
+| **Tool errors** | any failed tool call |
 
-contextrot extracts these signals per step, computes context fill at that moment, and correlates the two — with Wilson 95% confidence intervals, per-signal breakdowns, and honest n-counts. Then it estimates what degraded steps cost you and emits prescriptions quantified from your own data.
+Statistics are kept honest: Wilson 95% confidence intervals, per-signal breakdowns, visible n-counts, and a degradation threshold that only gets declared when a bucket's confidence floor clears the baseline — one noisy bucket can't scare you. Full method: [docs/methodology.md](docs/methodology.md).
 
-Full method: [docs/methodology.md](docs/methodology.md).
-
-## What contextrot is not
-
-Be suspicious of any tool that won't tell you this, so:
-
-- **Not a spend meter.** [ccusage](https://github.com/ryoppippi/ccusage) is excellent at "how much did I spend" — use it, it's complementary. contextrot answers "where does my agent *degrade* and why."
-- **Not Claude Code's `/context`.** That's a point-in-time composition snapshot. contextrot correlates fill with *outcomes* across your whole history.
-- **Not an observability platform.** Langfuse/Phoenix/MLflow instrument apps you build. contextrot needs zero instrumentation and analyzes the agent you *use*.
-- **Not a controlled experiment.** It's an observational diagnostic on your own data, with the statistical caveats printed right on the report.
-
-## Install & use
+## Commands
 
 ```bash
-uvx contextrot            # zero-install run
-# or
-pip install contextrot
+contextrot                      # full report, last 30 days
+contextrot --days 90            # more history = tighter statistics
+contextrot -p myproject         # one project only
+contextrot --html report.html   # shareable single-file report (still 100% local)
+contextrot --json               # every number, recomputable
+contextrot sessions             # list what was parsed
 ```
 
-```bash
-contextrot                        # full report, last 30 days
-contextrot --days 90              # widen the range
-contextrot -p myproject           # one project only
-contextrot --html report.html     # shareable single-file report (still local)
-contextrot --json                 # machine-readable
-contextrot sessions               # list what was parsed
-```
+## How is this different from…
 
-Supported agents: **Claude Code** (today). Codex CLI, OpenCode, Gemini CLI, and OpenTelemetry GenAI spans are next — an adapter is one small file, and [writing one is the paved first-contribution path](CONTRIBUTING.md).
+| Tool | Question it answers | What it can't tell you |
+|---|---|---|
+| [ccusage](https://github.com/ryoppippi/ccusage) | "How much did I spend?" | anything about output *quality* — use both, they're complementary |
+| Claude Code `/context` | "What's in my window right now?" | no outcomes, no history, no correlation |
+| Langfuse / Phoenix / MLflow | "How is the app I *built* behaving?" | require instrumentation; contextrot analyzes the agent you *use*, zero setup |
+| Chroma's research | "Do models degrade on benchmarks?" | nothing about your workload — contextrot is the personal-data counterpart |
 
-## Privacy
+## FAQ
 
-contextrot makes **zero network calls**. It reads local transcript files, prints to your terminal, and optionally writes a local HTML file. Nothing leaves your machine. Grep the codebase for `http` — you won't find a client.
+**The report says $2,000+ but I'm on a $20/month subscription. Is it broken?**
+No — that figure is the *token value* of your usage priced at API list rates, labeled as such in the report. It exists because tokens are the resource that fills your context window and burns your rate limits, and dollars are the only unit everyone reads instantly. Two honest readings: it's what your usage *would* cost pay-per-token (enjoy your subscription), and the "burned in degraded steps" share is the fraction of that resource going to rework. It is not, and never claims to be, your bill.
+
+**Why is the token flow so large?**
+Agents re-send the entire conversation to the model on *every* step. A 100-step session at 100k context ≈ 10M tokens flowing through — mostly cache reads. That's normal; it's also exactly why context bloat matters.
+
+**Correlation isn't causation, right?**
+Right, and the report says so on its face. Deep-context steps are also later-in-task steps. contextrot is an observational diagnostic with conservative statistics, not a lab experiment — see [methodology](docs/methodology.md).
+
+**What about my privacy?**
+contextrot makes **zero network calls**. Local files in, terminal/local HTML out. Grep the codebase for an HTTP client — there isn't one.
+
+## Supported agents
+
+| Agent | Status |
+|---|---|
+| Claude Code | ✅ today |
+| Codex CLI | planned — [adapter wanted](https://github.com/Priyanshu-byte-coder/contextrot/issues) |
+| OpenCode | planned — adapter wanted |
+| Gemini CLI | planned — adapter wanted |
+| OpenTelemetry GenAI spans | planned |
+
+An adapter is one small file with a fixture and a test — [it's the paved first-contribution path](CONTRIBUTING.md).
 
 ## Roadmap
 
 - `contextrot fix` — apply prescriptions interactively (disable unused MCP servers, trim CLAUDE.md) with before/after measurement
 - More agent adapters + OTel ingestion
-- Opt-in, anonymized aggregate stats → the **State of Context Rot** report: real-workload degradation curves across the community (off by default, documented schema, aggregate-only)
+- Opt-in, anonymized aggregate stats → the **State of Context Rot** report: real-workload degradation curves across the community (off by default, aggregate-only, documented schema)
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). The most valuable first PR: an adapter for the agent CLI you use.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Most valuable first PR: an adapter for the agent CLI you use.
 
 ## License
 

@@ -96,10 +96,17 @@ def _headline(result: AnalysisResult) -> Panel:
     lines.append(t)
 
     t = Text()
-    t.append("Est. spend on degraded steps: ", style="bold")
+    t.append("Token value burned in degraded steps: ", style="bold")
     t.append(f"${result.rework_cost_usd:.2f}", style="bold red")
-    t.append(f" of ${result.total_cost_usd:.2f} API-equivalent total")
+    t.append(f" of ${result.total_cost_usd:.2f} total")
     lines.append(t)
+    lines.append(
+        Text(
+            "  (tokens priced at API list rates — an efficiency yardstick, not your "
+            "bill; subscriptions pay a flat fee)",
+            style="dim",
+        )
+    )
 
     return Panel(
         Group(*lines), title="[bold]contextrot — your context rot report[/bold]", padding=(1, 2)

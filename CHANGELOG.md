@@ -4,6 +4,17 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.1.2] - 2026-07-03
+
+### Changed
+
+- Cost figures relabeled as "token value at API list rates" with an inline explainer — an efficiency yardstick, not a bill (clears up confusion for subscription users); `--json` now carries `pricing_basis`
+- README rebuilt: logo, verdict table, signal table, comparison table, FAQ (including the subscription-cost question)
+
+### Added
+
+- Project logo (light/dark variants)
+
 ## [0.1.1] - 2026-07-03
 
 ### Added
