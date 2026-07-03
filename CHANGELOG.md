@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.1.3] - 2026-07-03
+
+### Changed
+
+- Downloads badge in README (stats providers now index the package)
+- Republished so PyPI renders the rebuilt README from 0.1.2
+
 ## [0.1.2] - 2026-07-03
 
 ### Changed
