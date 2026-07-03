@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.1.5] - 2026-07-03
+
+### Fixed
+
+- `--version` reported a stale hardcoded number; `__version__` now reads the
+  installed package metadata (single source of truth: pyproject.toml)
+
 ## [0.1.4] - 2026-07-03
 
 ### Fixed
