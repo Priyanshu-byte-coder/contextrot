@@ -145,7 +145,11 @@ def main(
     if html is not None:
         from contextrot.report import render_html
 
-        out = render_html(result, html)
+        try:
+            out = render_html(result, html)
+        except OSError as e:
+            console.print(f"[red]Couldn't write HTML report to {html}:[/red] {e}")
+            raise typer.Exit(code=1) from e
         console.print(f"[green]HTML report written:[/green] {out}")
 
 

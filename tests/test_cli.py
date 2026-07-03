@@ -41,6 +41,16 @@ def test_html_report_written(tmp_path: Path):
     assert 'src="https' not in html and 'href="https' not in html
 
 
+def test_html_report_written_to_directory(tmp_path: Path):
+    result = runner.invoke(
+        app, ["--data-dir", str(FIXTURES), "--days", "0", "--html", str(tmp_path)]
+    )
+    assert result.exit_code == 0
+    out = tmp_path / "contextrot-report.html"
+    assert out.exists()
+    assert "<svg" in out.read_text(encoding="utf-8")
+
+
 def test_sessions_subcommand():
     result = runner.invoke(app, ["sessions", "--data-dir", str(FIXTURES), "--days", "0"])
     assert result.exit_code == 0

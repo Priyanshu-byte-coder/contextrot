@@ -28,6 +28,8 @@ def render_html(result: AnalysisResult, out_path: Path) -> Path:
     template = env.get_template("template.html.j2")
     html = template.render(**_context(result))
     out_path = out_path.expanduser().resolve()
+    if out_path.is_dir():
+        out_path = out_path / "contextrot-report.html"
     out_path.write_text(html, encoding="utf-8")
     return out_path
 

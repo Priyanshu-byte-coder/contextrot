@@ -4,6 +4,16 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.1.6] - 2026-07-03
+
+### Fixed
+
+- `--html <directory>` crashed with `PermissionError`/`IsADirectoryError` on
+  Windows/POSIX because it tried to open the directory itself as a file.
+  Now writes `contextrot-report.html` inside the given directory.
+- HTML-write failures now print a plain error and exit(1) instead of a raw
+  traceback.
+
 ## [0.1.5] - 2026-07-03
 
 ### Fixed
