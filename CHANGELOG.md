@@ -4,6 +4,20 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.1.4] - 2026-07-03
+
+### Fixed
+
+- Python 3.9 and 3.10 compatibility: `pip3 install contextrot` now works on the
+  stock macOS python3 (3.9.6) — runtime pipe-unions in the CLI replaced with
+  `Optional[...]`, `datetime.UTC` replaced with `timezone.utc`
+- CI now tests 3.9–3.13 across Linux/macOS/Windows
+
+### Changed
+
+- Downloads badge switched to pepy.tech total-downloads badge
+- README: pip install path documented alongside `uvx`
+
 ## [0.1.3] - 2026-07-03
 
 ### Changed

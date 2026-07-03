@@ -1,12 +1,15 @@
-"""contextrot command-line interface."""
+"""contextrot command-line interface.
 
-from __future__ import annotations
+No `from __future__ import annotations` here: on Python 3.9 typer cannot
+evaluate string annotations, which silently strips every typer.Option's
+metadata. All annotations in this module must be valid at runtime.
+"""
 
 import contextlib
 import json
 import sys
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 import typer
 from rich.console import Console
@@ -33,16 +36,18 @@ app = typer.Typer(
 )
 console = Console()
 
+# Optional[...] rather than `X | None`: these are evaluated at runtime (module
+# level and again by typer's introspection), and pipe unions need Python 3.10.
 DataDir = Annotated[
-    Path | None,
+    Optional[Path],
     typer.Option("--data-dir", help="Transcript directory (default: ~/.claude/projects)."),
 ]
 ProjectF = Annotated[
-    str | None, typer.Option("--project", "-p", help="Only sessions whose project matches.")
+    Optional[str], typer.Option("--project", "-p", help="Only sessions whose project matches.")
 ]
 Days = Annotated[int, typer.Option("--days", "-d", help="Only sessions from the last N days.")]
 Window = Annotated[
-    int | None, typer.Option("--window", help="Override the context-window size in tokens.")
+    Optional[int], typer.Option("--window", help="Override the context-window size in tokens.")
 ]
 
 
@@ -56,7 +61,7 @@ def _project_basename(project: str) -> str:
     return project.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1] or project
 
 
-def _finite_or_none(value: float | None) -> float | None:
+def _finite_or_none(value: Optional[float]) -> Optional[float]:
     if value is None or value == float("inf"):
         return None
     return round(value, 3)
@@ -77,10 +82,10 @@ def main(
     window: Window = None,
     as_json: Annotated[bool, typer.Option("--json", help="Machine-readable output.")] = False,
     html: Annotated[
-        Path | None, typer.Option("--html", help="Also write a shareable HTML report.")
+        Optional[Path], typer.Option("--html", help="Also write a shareable HTML report.")
     ] = None,
     version: Annotated[
-        bool | None,
+        Optional[bool],
         typer.Option("--version", callback=_version_callback, is_eager=True),
     ] = None,
 ) -> None:

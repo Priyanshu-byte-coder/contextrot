@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from contextrot.adapters import ADAPTERS
@@ -42,13 +42,13 @@ def load_sessions(
     """Discover and parse sessions across all adapters. Returns (sessions, skipped)."""
     sessions: list[Session] = []
     skipped = 0
-    cutoff = datetime.now(UTC) - timedelta(days=days) if days else None
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
 
     for adapter in ADAPTERS.values():
         for path in adapter.discover(data_dir):
             if cutoff is not None:
                 try:
-                    mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
+                    mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
                     if mtime < cutoff:
                         continue
                 except OSError:
@@ -61,7 +61,7 @@ def load_sessions(
                 continue
             sessions.append(session)
 
-    sessions.sort(key=lambda s: (s.started_at or datetime.min.replace(tzinfo=UTC)))
+    sessions.sort(key=lambda s: (s.started_at or datetime.min.replace(tzinfo=timezone.utc)))
     return sessions, skipped
 
 

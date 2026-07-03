@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="https://pypi.org/project/contextrot/"><img src="https://img.shields.io/pypi/v/contextrot?color=2a78d6" alt="PyPI version"></a>
-  <a href="https://pepy.tech/projects/contextrot"><img src="https://img.shields.io/pypi/dm/contextrot?color=2a78d6" alt="PyPI downloads"></a>
+  <a href="https://pepy.tech/projects/contextrot"><img src="https://static.pepy.tech/personalized-badge/contextrot?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads"></a>
   <a href="https://pypi.org/project/contextrot/"><img src="https://img.shields.io/pypi/pyversions/contextrot?color=2a78d6" alt="Python versions"></a>
   <a href="https://github.com/Priyanshu-byte-coder/contextrot/actions/workflows/ci.yml"><img src="https://github.com/Priyanshu-byte-coder/contextrot/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2a78d6" alt="License: MIT"></a>
@@ -19,6 +19,13 @@
 
 ```bash
 uvx contextrot
+```
+
+or, with plain pip (Python 3.9+ — including the stock python3 on macOS):
+
+```bash
+pip3 install contextrot
+contextrot
 ```
 
 That's it. No config, no API keys, no uploads. contextrot reads the session transcripts your agent CLI already keeps on disk and answers a question no other tool answers:
