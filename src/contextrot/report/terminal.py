@@ -7,16 +7,39 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from contextrot.analysis import AnalysisResult
+from contextrot.analysis import AnalysisResult, RotCurve
+from contextrot.report._hero import hero_stat
 
 BAR_WIDTH = 40
+_SPARK = "▁▂▃▄▅▆▇█"
 
 
 def _bar(rate: float, max_rate: float, width: int = BAR_WIDTH) -> str:
     if max_rate <= 0:
         return ""
-    filled = round(width * rate / max_rate)
+    filled = min(width, round(width * rate / max_rate))
     return "█" * filled
+
+
+def _curve_max_rate(curve: RotCurve) -> float:
+    """Bar scale: ignore low-confidence buckets so a noisy 4-step bucket
+    can't flatten the real bars (parity with the HTML chart)."""
+    visible = [b for b in curve.buckets if b.n]
+    trusted = [b for b in visible if not b.low_confidence] or visible
+    return max((b.rate for b in trusted), default=0.0)
+
+
+def _sparkline(curve: RotCurve) -> str:
+    max_rate = _curve_max_rate(curve)
+    if max_rate <= 0:
+        return ""
+    out = []
+    for b in curve.buckets:
+        if b.n == 0:
+            continue
+        idx = min(int(min(b.rate, max_rate) / max_rate * (len(_SPARK) - 1)), len(_SPARK) - 1)
+        out.append(_SPARK[idx])
+    return "".join(out)
 
 
 def render(result: AnalysisResult, console: Console | None = None) -> None:
@@ -29,6 +52,10 @@ def render(result: AnalysisResult, console: Console | None = None) -> None:
 
     if curve.total_steps:
         console.print(_rot_curve_table(result))
+        console.print()
+
+    if len([m for m in result.models if not m.is_other]) >= 2:
+        console.print(_models_table(result))
         console.print()
 
     console.print(_composition_panel(result))
@@ -56,9 +83,38 @@ _VERDICT_STYLE = {
 _VERDICT_ICON = {"rot": "✗ ", "edge": "! ", "clean": "✓ ", "insufficient": "? "}
 
 
+_VERDICT_COLOR = {"rot": "red", "edge": "yellow", "clean": "green", "insufficient": "yellow"}
+
+
 def _headline(result: AnalysisResult) -> Panel:
     curve = result.curve
+    color = _VERDICT_COLOR[result.verdict_kind]
+    hero = hero_stat(result)
     lines: list[Text] = []
+
+    # Verdict word, color-blocked (reverse degrades gracefully under NO_COLOR).
+    lines.append(
+        Text(
+            f" {_VERDICT_ICON[result.verdict_kind].strip()} {hero['headline_word']} ",
+            style=f"bold {color} reverse",
+        )
+    )
+    lines.append(Text())
+
+    # The one number, on its own line so it reads big.
+    t = Text()
+    t.append(f"  {hero['value']}  ", style=f"bold {color}")
+    t.append(hero["label"], style="dim")
+    lines.append(t)
+
+    spark = _sparkline(curve)
+    if spark:
+        t = Text()
+        t.append("  rot curve ", style="dim")
+        t.append(spark, style=color)
+        t.append("  (fill 0→100%)", style="dim")
+        lines.append(t)
+    lines.append(Text())
 
     lines.append(
         Text(
@@ -109,13 +165,16 @@ def _headline(result: AnalysisResult) -> Panel:
     )
 
     return Panel(
-        Group(*lines), title="[bold]contextrot — your context rot report[/bold]", padding=(1, 2)
+        Group(*lines),
+        title="[bold]contextrot — your context rot report[/bold]",
+        border_style=color,
+        padding=(1, 3),
     )
 
 
 def _rot_curve_table(result: AnalysisResult) -> Table:
     curve = result.curve
-    max_rate = max((b.rate for b in curve.buckets if b.n), default=0.0)
+    max_rate = _curve_max_rate(curve)
 
     table = Table(
         title="Failure-signal rate by context fill",
@@ -145,6 +204,50 @@ def _rot_curve_table(result: AnalysisResult) -> Table:
 
     if any(b.low_confidence for b in curve.buckets if b.n):
         table.caption = "* fewer than 15 steps in bucket — low confidence"
+    return table
+
+
+def _models_table(result: AnalysisResult) -> Table:
+    table = Table(title="By model", show_edge=False, pad_edge=False)
+    table.add_column("Model", style="cyan")
+    table.add_column("Steps", justify="right", style="dim")
+    table.add_column("Fresh", justify="right")
+    table.add_column("Deep", justify="right")
+    table.add_column("Ratio", justify="right")
+    table.add_column("Threshold", justify="right")
+    table.add_column("Verdict")
+
+    def fmt_rate(r: float | None) -> str:
+        return f"{r:.1%}" if r is not None else "n/a"
+
+    for m in result.models:
+        c = m.curve
+        ratio = c.degradation_ratio
+        if ratio is None:
+            ratio_s = "n/a"
+        elif ratio == float("inf"):
+            ratio_s = "∞"
+        else:
+            ratio_s = f"{ratio:.1f}×"
+        knee_s = f"~{c.knee_pct}%" if c.knee_pct is not None else "none"
+        if m.is_other:
+            verdict_cell = Text("—", style="dim")
+        else:
+            verdict_cell = Text(
+                _VERDICT_ICON[m.verdict_kind] + m.verdict_kind,
+                style=_VERDICT_STYLE[m.verdict_kind],
+            )
+        row_style = "dim" if m.is_other else ""
+        table.add_row(
+            Text(m.label, style=row_style or "cyan"),
+            str(m.steps),
+            fmt_rate(c.low_fill_rate),
+            fmt_rate(c.high_fill_rate),
+            ratio_s,
+            knee_s,
+            verdict_cell,
+            style=row_style or None,
+        )
     return table
 
 

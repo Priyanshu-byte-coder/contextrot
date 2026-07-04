@@ -71,6 +71,8 @@ Agent CLIs like Claude Code log every session to local JSONL transcripts. Each s
 
 Statistics are kept honest: Wilson 95% confidence intervals, per-signal breakdowns, visible n-counts, and a degradation threshold that only gets declared when a bucket's confidence floor clears the baseline — one noisy bucket can't scare you. Full method: [docs/methodology.md](docs/methodology.md).
 
+Use more than one model? The report also compares them head-to-head — an independent rot curve and verdict per model family (Opus vs Sonnet vs Haiku), on a shared scale, so you can see which model degrades first *for your workload*.
+
 ## Commands
 
 ```bash
@@ -78,6 +80,9 @@ contextrot                      # full report, last 30 days
 contextrot --days 90            # more history = tighter statistics
 contextrot -p myproject         # one project only
 contextrot --html report.html   # shareable single-file report (still 100% local)
+                                #   includes a 1200×630 share card — save as PNG,
+                                #   post it; and a per-model comparison when you
+                                #   use more than one model
 contextrot --json               # every number, recomputable
 contextrot sessions             # list what was parsed
 ```

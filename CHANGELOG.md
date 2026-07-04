@@ -4,6 +4,28 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.2.0] - 2026-07-04
+
+### Added
+
+- Hero verdict banner leading both reports: verdict word + one big memorable
+  number (ratio / threshold / steps), color-blocked in HTML, color-boxed with a
+  unicode sparkline of the rot curve in the terminal
+- **Share card**: 1200×630 social-ready card in the HTML report with
+  Save-as-PNG and Download-SVG buttons — pure inline SVG, still zero network
+- **Per-model comparison**: independent rot curve + verdict per model family
+  (Opus vs Sonnet vs …), comparison table in both reports, small-multiple
+  charts on a shared scale in HTML, additive `models` key in `--json`;
+  models under 150 steps fold into "Other"
+
+### Fixed
+
+- HTML chart y-axis was squashed when a tiny bucket's wide confidence interval
+  set the scale (seen in real user reports) — low-confidence buckets no longer
+  drive the axis, in HTML or terminal
+- "CIs overlap" jargon in the HTML tile now reads "within statistical noise",
+  matching the terminal
+
 ## [0.1.7] - 2026-07-04
 
 ### Added

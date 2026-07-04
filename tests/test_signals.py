@@ -4,7 +4,9 @@ from contextrot.adapters.claude_code import ClaudeCodeAdapter
 from contextrot.signals import extract_signals
 
 SESSION_FILE = (
-    Path(__file__).parent / "fixtures" / "demo-project"
+    Path(__file__).parent
+    / "fixtures"
+    / "demo-project"
     / "11111111-2222-3333-4444-555555555555.jsonl"
 )
 

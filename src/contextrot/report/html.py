@@ -12,12 +12,32 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from contextrot import __version__
 from contextrot.analysis import AnalysisResult
+from contextrot.analysis.rot import RotCurve
+from contextrot.report._hero import hero_stat
 
 # Chart geometry (viewBox units)
 _PLOT_X0, _PLOT_X1 = 60, 840
 _PLOT_Y0, _PLOT_Y1 = 20, 260  # y grows downward; Y1 is the baseline
 
 _COMP_COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"]
+
+# Share-card palette. Literal hex, never CSS vars: the card SVG is serialized
+# and rasterized outside the page, where page-level custom properties do not
+# exist. Fixed dark design so every export looks identical.
+_CARD = {
+    "bg": "#0d0d0d",
+    "surface": "#1a1a19",
+    "ink": "#ffffff",
+    "muted": "#898781",
+    "grid": "#2c2c2a",
+    "bar": "#3987e5",
+}
+_CARD_ACCENT = {
+    "rot": "#e05252",
+    "edge": "#fab219",
+    "clean": "#22b322",
+    "insufficient": "#fab219",
+}
 
 
 def render_html(result: AnalysisResult, out_path: Path) -> Path:
@@ -34,45 +54,46 @@ def render_html(result: AnalysisResult, out_path: Path) -> Path:
     return out_path
 
 
-def _context(result: AnalysisResult) -> dict:
-    curve = result.curve
-    ratio = curve.degradation_ratio
-    if ratio is None:
-        ratio_str = "n/a"
-    elif ratio == float("inf"):
-        ratio_str = "∞"
-    else:
-        ratio_str = f"{ratio:.1f}×"
+def _chart_max_rate(buckets: list) -> float:
+    """Y-axis ceiling for the rot chart.
 
-    icons = {"rot": "✗", "edge": "!", "clean": "✓", "insufficient": "?"}
-    headline = {
-        "verdict_kind": result.verdict_kind,
-        "verdict_text": result.verdict_text,
-        "verdict_icon": icons.get(result.verdict_kind, ""),
-        "ratio": None if ratio in (None, float("inf")) else ratio,
-        "ratio_str": ratio_str,
-        "high_rate": f"{curve.high_fill_rate:.1%}" if curve.high_fill_rate is not None else "n/a",
-        "low_rate": f"{curve.low_fill_rate:.1%}" if curve.low_fill_rate is not None else "n/a",
-        "significant": curve.ratio_significant,
-        "knee_str": f"~{curve.knee_pct}%" if curve.knee_pct is not None else "not found",
-        "rework_cost": result.rework_cost_usd,
-        "total_cost": result.total_cost_usd,
-    }
+    Low-confidence buckets are excluded: a 4-step bucket's Wilson interval
+    tops out near 50% and squashes every real bar to the baseline. Fall back
+    to all visible buckets when everything is low-confidence.
+    """
+    visible = [b for b in buckets if b.n > 0]
+    trusted = [b for b in visible if not b.low_confidence] or visible
+    max_rate = max((b.ci[1] for b in trusted), default=0.05)
+    return max(max_rate, 0.05)
 
-    visible = [b for b in curve.buckets if b.n > 0]
-    max_rate = max((b.ci[1] for b in visible), default=0.05)
-    max_rate = max(max_rate, 0.05)
+
+def _curve_geometry(
+    curve: RotCurve,
+    x0: float,
+    x1: float,
+    y0: float,
+    y1: float,
+    max_rate: float | None = None,
+) -> dict:
+    """Bars/gridlines/knee_x for a RotCurve rendered into an arbitrary plot
+    rect. Pass a shared ``max_rate`` to place several curves on one honest
+    y-scale (model small-multiples)."""
+    if max_rate is None:
+        max_rate = _chart_max_rate(curve.buckets)
 
     def y_of(rate: float) -> float:
-        return _PLOT_Y1 - (rate / max_rate) * (_PLOT_Y1 - _PLOT_Y0)
+        return y1 - (min(rate, max_rate) / max_rate) * (y1 - y0)
 
-    slot_w = (_PLOT_X1 - _PLOT_X0) / len(curve.buckets)
+    visible = [b for b in curve.buckets if b.n > 0]
+    peak_rate = max((v.rate for v in visible), default=0)
+
+    slot_w = (x1 - x0) / len(curve.buckets)
     bar_w = slot_w * 0.6
     bars = []
     for i, b in enumerate(curve.buckets):
         if b.n == 0:
             continue
-        x = _PLOT_X0 + i * slot_w + (slot_w - bar_w) / 2
+        x = x0 + i * slot_w + (slot_w - bar_w) / 2
         cx = x + bar_w / 2
         y = y_of(b.rate)
         lo_ci, hi_ci = b.ci
@@ -82,15 +103,16 @@ def _context(result: AnalysisResult) -> dict:
                 "x": round(x, 1),
                 "y": round(y, 1),
                 "w": round(bar_w, 1),
-                "h": round(max(_PLOT_Y1 - y, 1.5), 1),
+                "h": round(max(y1 - y, 1.5), 1),
                 "cx": round(cx, 1),
                 "ci_top": round(y_of(hi_ci), 1),
                 "ci_bot": round(y_of(lo_ci), 1),
                 "label": f"{b.lo}–{b.hi}",
                 "val": f"{b.rate:.0%}",
-                "show_val": b.rate == max((v.rate for v in visible), default=0) and b.rate > 0,
+                "show_val": b.rate == peak_rate and b.rate > 0,
                 "past_knee": past_knee,
                 "low_conf": b.low_confidence,
+                "clipped": hi_ci > max_rate,
                 "tip": (
                     f"{b.lo}–{b.hi}% fill: {b.rate:.1%} of {b.n} steps degraded "
                     f"(95% CI {lo_ci:.0%}–{hi_ci:.0%})"
@@ -105,7 +127,92 @@ def _context(result: AnalysisResult) -> dict:
 
     knee_x = None
     if curve.knee_pct is not None:
-        knee_x = round(_PLOT_X0 + (curve.knee_pct / 100.0) * (_PLOT_X1 - _PLOT_X0), 1)
+        knee_x = round(x0 + (curve.knee_pct / 100.0) * (x1 - x0), 1)
+
+    return {"bars": bars, "gridlines": gridlines, "knee_x": knee_x, "max_rate": max_rate}
+
+
+def _wrap(text: str, width: int = 48, max_lines: int = 2) -> list[str]:
+    """Word-wrap for SVG <text> lines (SVG has no text wrapping)."""
+    words = text.split()
+    lines: list[str] = []
+    cur = ""
+    for w in words:
+        cand = f"{cur} {w}".strip()
+        if len(cand) > width and cur:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = cand
+    if cur:
+        lines.append(cur)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        cut = lines[-1][: width - 1]
+        if " " in cut:
+            cut = cut.rsplit(" ", 1)[0]
+        lines[-1] = cut.rstrip() + " …"
+    return lines
+
+
+def _fmt_rate(rate: float | None) -> str:
+    return f"{rate:.1%}" if rate is not None else "n/a"
+
+
+def _fmt_ratio(ratio: float | None) -> str:
+    if ratio is None:
+        return "n/a"
+    if ratio == float("inf"):
+        return "∞"
+    return f"{ratio:.1f}×"
+
+
+def _context(result: AnalysisResult) -> dict:
+    curve = result.curve
+    ratio = curve.degradation_ratio
+    ratio_str = _fmt_ratio(ratio)
+
+    icons = {"rot": "✗", "edge": "!", "clean": "✓", "insufficient": "?"}
+    headline = {
+        "verdict_kind": result.verdict_kind,
+        "verdict_text": result.verdict_text,
+        "verdict_icon": icons.get(result.verdict_kind, ""),
+        "ratio": None if ratio in (None, float("inf")) else ratio,
+        "ratio_str": ratio_str,
+        "high_rate": _fmt_rate(curve.high_fill_rate),
+        "low_rate": _fmt_rate(curve.low_fill_rate),
+        "significant": curve.ratio_significant,
+        "knee_str": f"~{curve.knee_pct}%" if curve.knee_pct is not None else "not found",
+        "rework_cost": result.rework_cost_usd,
+        "total_cost": result.total_cost_usd,
+    }
+
+    hero = hero_stat(result)
+    chart = _curve_geometry(curve, _PLOT_X0, _PLOT_X1, _PLOT_Y0, _PLOT_Y1)
+
+    # Model comparison: shared y-scale across all minis, or the comparison lies.
+    models = []
+    real_models = [m for m in result.models if not m.is_other]
+    if len(real_models) >= 2:
+        shared_max = max(_chart_max_rate(m.curve.buckets) for m in real_models)
+        for m in result.models:
+            mini = None
+            if not m.is_other:
+                mini = _curve_geometry(m.curve, 10, 270, 10, 100, max_rate=shared_max)
+            models.append(
+                {
+                    "label": m.label,
+                    "steps": m.steps,
+                    "fresh": _fmt_rate(m.curve.low_fill_rate),
+                    "deep": _fmt_rate(m.curve.high_fill_rate),
+                    "ratio": _fmt_ratio(m.curve.degradation_ratio),
+                    "knee": (f"~{m.curve.knee_pct}%" if m.curve.knee_pct is not None else "none"),
+                    "verdict_kind": m.verdict_kind,
+                    "verdict_icon": icons.get(m.verdict_kind, ""),
+                    "is_other": m.is_other,
+                    "mini": mini,
+                }
+            )
 
     comp = result.composition
     comp_rows_src = [
@@ -147,6 +254,20 @@ def _context(result: AnalysisResult) -> dict:
             }
         )
 
+    # Share card: mini curve on the card's own plot rect, fixed hex colors.
+    card_chart = _curve_geometry(curve, 640, 1140, 170, 470)
+    card = {
+        **_CARD,
+        "accent": _CARD_ACCENT.get(result.verdict_kind, _CARD["bar"]),
+        "hero": hero,
+        "verdict_lines": _wrap(result.verdict_text, width=52, max_lines=3),
+        "chart": card_chart,
+        "footer": (
+            f"{len(result.sessions)} sessions · {curve.total_steps:,} steps · "
+            "pip install contextrot"
+        ),
+    }
+
     return {
         "meta": {
             "sessions": len(result.sessions),
@@ -156,7 +277,9 @@ def _context(result: AnalysisResult) -> dict:
             "version": __version__,
         },
         "headline": headline,
-        "chart": {"bars": bars, "gridlines": gridlines, "knee_x": knee_x},
+        "hero": hero,
+        "chart": chart,
+        "models": models,
         "comp": {
             "rows": comp_rows,
             "height": 10 + len(comp_rows) * 30 + 10,
@@ -164,4 +287,5 @@ def _context(result: AnalysisResult) -> dict:
         },
         "prescriptions": result.prescriptions,
         "table_rows": table_rows,
+        "card": card,
     }

@@ -10,9 +10,7 @@ runner = CliRunner()
 
 
 def test_default_report_runs():
-    result = runner.invoke(
-        app, ["--data-dir", str(FIXTURES), "--days", "0"], env={"NO_COLOR": "1"}
-    )
+    result = runner.invoke(app, ["--data-dir", str(FIXTURES), "--days", "0"], env={"NO_COLOR": "1"})
     assert result.exit_code == 0
     assert "context rot report" in result.output
 
@@ -25,13 +23,13 @@ def test_json_output_shape():
     assert len(payload["steps"]) == 5
     assert payload["cost"]["total_usd"] >= 0
     assert any(b["n"] for b in payload["curve"]["buckets"])
+    # Additive per-model key: always present, empty for the single-model fixture.
+    assert payload["models"] == []
 
 
 def test_html_report_written(tmp_path: Path):
     out = tmp_path / "report.html"
-    result = runner.invoke(
-        app, ["--data-dir", str(FIXTURES), "--days", "0", "--html", str(out)]
-    )
+    result = runner.invoke(app, ["--data-dir", str(FIXTURES), "--days", "0", "--html", str(out)])
     assert result.exit_code == 0
     html = out.read_text(encoding="utf-8")
     assert "<svg" in html

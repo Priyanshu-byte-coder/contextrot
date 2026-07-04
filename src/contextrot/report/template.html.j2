@@ -10,7 +10,7 @@
     --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
     --grid: #e1e0d9; --baseline: #c3c2b7; --ring: rgba(11,11,11,0.10);
     --series-1: #2a78d6; --series-2: #1baf7a; --series-3: #eda100; --series-4: #008300;
-    --critical: #d03b3b; --warning: #fab219; --good: #006300;
+    --critical: #d03b3b; --warning: #b97d00; --good: #006300;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -18,33 +18,55 @@
       --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-muted: #898781;
       --grid: #2c2c2a; --baseline: #383835; --ring: rgba(255,255,255,0.10);
       --series-1: #3987e5; --series-2: #199e70; --series-3: #c98500; --series-4: #008300;
-      --critical: #d03b3b; --warning: #fab219; --good: #0ca30c;
+      --critical: #e05252; --warning: #fab219; --good: #22b322;
     }
   }
   * { box-sizing: border-box; margin: 0; }
   body {
     background: var(--page); color: var(--ink-1);
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    line-height: 1.5; padding: 2rem 1rem; max-width: 60rem; margin: 0 auto;
+    line-height: 1.5; padding: 2rem 1rem; max-width: 64rem; margin: 0 auto;
   }
-  h1 { font-size: 1.4rem; margin-bottom: .25rem; }
+  h1 { font-size: 1.05rem; letter-spacing: .01em; }
   h2 { font-size: 1.05rem; margin: 0 0 .75rem; }
-  .sub { color: var(--ink-2); font-size: .9rem; margin-bottom: 1.5rem; }
+  .head { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .sub { color: var(--ink-2); font-size: .9rem; }
   .card {
-    background: var(--surface-1); border: 1px solid var(--ring); border-radius: 12px;
+    background: var(--surface-1); border: 1px solid var(--ring); border-radius: 16px;
     padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; overflow-x: auto;
+  }
+  .hero {
+    border-radius: 16px; border: 1px solid var(--ring);
+    padding: 2rem 2.5rem; margin-bottom: 1.25rem;
+  }
+  .hero.rot { background: rgba(208,59,59,.08); border-color: rgba(208,59,59,.35); }
+  .hero.edge, .hero.insufficient { background: rgba(250,178,25,.10); border-color: rgba(250,178,25,.40); }
+  .hero.clean { background: rgba(12,163,12,.08); border-color: rgba(12,163,12,.35); }
+  .hero-word { font-weight: 800; font-size: .95rem; letter-spacing: .12em; }
+  .hero.rot .hero-word, .hero.rot .hero-num { color: var(--critical); }
+  .hero.edge .hero-word, .hero.edge .hero-num,
+  .hero.insufficient .hero-word, .hero.insufficient .hero-num { color: var(--warning); }
+  .hero.clean .hero-word, .hero.clean .hero-num { color: var(--good); }
+  .hero-num {
+    font-size: clamp(3.5rem, 9vw, 5.5rem); font-weight: 800; line-height: 1.05;
+    letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
+  }
+  .hero-label { color: var(--ink-2); font-size: 1.05rem; margin-bottom: .75rem; }
+  .hero-text { font-size: .95rem; margin-bottom: .75rem; }
+  .hero-secondary { display: flex; gap: .6rem; flex-wrap: wrap; }
+  .hero-secondary span {
+    background: var(--surface-1); border: 1px solid var(--ring); border-radius: 999px;
+    padding: .15rem .7rem; font-size: .8rem; color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
   }
   .tiles { display: flex; gap: 1.25rem; flex-wrap: wrap; }
   .tile { flex: 1 1 12rem; }
-  .tile .v { font-size: 2rem; font-weight: 700; }
+  .tile .v { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
   .tile .l { color: var(--ink-2); font-size: .85rem; }
   .tile .v.bad { color: var(--critical); }
-  .verdict { font-weight: 700; font-size: 1.05rem; }
-  .verdict.rot { color: var(--critical); }
-  .verdict.clean { color: var(--good); }
-  .verdict.edge { color: var(--warning); }
-  .verdict.insufficient { color: var(--warning); }
-  svg text { fill: var(--ink-muted); font-size: 11px; font-family: inherit; }
+  /* Chart text — but never the share card, whose SVG carries its own
+     presentation attributes (CSS would override them in-page). */
+  svg:not(#share-card) text { fill: var(--ink-muted); font-size: 11px; font-family: inherit; }
   svg .val { fill: var(--ink-2); font-weight: 600; }
   svg .ref-label { fill: var(--critical); font-weight: 600; }
   table { border-collapse: collapse; width: 100%; font-size: .85rem; }
@@ -52,11 +74,27 @@
   th:first-child, td:first-child { text-align: left; }
   th { color: var(--ink-2); font-weight: 600; }
   td { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  td.v-rot { color: var(--critical); font-weight: 700; }
+  td.v-edge, td.v-insufficient { color: var(--warning); font-weight: 700; }
+  td.v-clean { color: var(--good); font-weight: 700; }
+  tr.other td { color: var(--ink-muted); }
+  .minis { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+           gap: 1rem; margin-top: 1rem; }
+  .mini h3 { font-size: .85rem; font-weight: 600; color: var(--ink-2); margin: 0 0 .25rem; }
   .rx { margin: 0; padding-left: 1.2rem; }
   .rx li { margin-bottom: .9rem; }
   .rx .t { font-weight: 700; }
   .rx .d { color: var(--ink-2); font-size: .92rem; }
   .rx .i { color: var(--ink-muted); font-size: .85rem; }
+  .share-wrap svg { width: 100%; height: auto; border-radius: 12px; }
+  .share-actions { display: flex; gap: .75rem; align-items: center; margin-top: .75rem; flex-wrap: wrap; }
+  .share-actions button {
+    font: inherit; font-weight: 600; cursor: pointer; border-radius: 8px;
+    padding: .45rem 1rem; border: 1px solid var(--ring);
+    background: var(--ink-1); color: var(--page);
+  }
+  .share-actions button.ghost { background: transparent; color: var(--ink-1); }
+  .share-note { color: var(--ink-muted); font-size: .8rem; }
   .note { color: var(--ink-muted); font-size: .8rem; margin-top: 2rem; }
   #tip {
     position: fixed; pointer-events: none; display: none; z-index: 10;
@@ -67,17 +105,25 @@
 </style>
 </head>
 <body>
-<h1>contextrot — context rot report</h1>
-<p class="sub">{{ meta.sessions }} sessions · {{ meta.steps }} steps{% if meta.days %} · last {{ meta.days }} days{% endif %} · generated locally, nothing uploaded</p>
+<div class="head">
+  <h1>contextrot — context rot report</h1>
+  <p class="sub">{{ meta.sessions }} sessions · {{ meta.steps }} steps{% if meta.days %} · last {{ meta.days }} days{% endif %} · generated locally, nothing uploaded</p>
+</div>
 
-<div class="card">
-  <p class="verdict {{ headline.verdict_kind }}">{{ headline.verdict_icon }} {{ headline.verdict_text }}</p>
+<div class="hero {{ hero.kind }}">
+  <div class="hero-word">{{ headline.verdict_icon }} {{ hero.headline_word }}</div>
+  <div class="hero-num">{{ hero.value }}</div>
+  <div class="hero-label">{{ hero.label }}</div>
+  <p class="hero-text">{{ headline.verdict_text }}</p>
+  {% if hero.secondary %}
+  <div class="hero-secondary">{% for s in hero.secondary %}<span>{{ s }}</span>{% endfor %}</div>
+  {% endif %}
 </div>
 
 <div class="card tiles">
   <div class="tile">
     <div class="v {% if headline.ratio and headline.ratio >= 1.5 %}bad{% endif %}">{{ headline.ratio_str }}</div>
-    <div class="l">deep-context vs fresh-context failure rate ({{ headline.high_rate }} vs {{ headline.low_rate }}){% if not headline.significant %} — CIs overlap{% endif %}</div>
+    <div class="l">deep-context vs fresh-context failure rate ({{ headline.high_rate }} vs {{ headline.low_rate }}){% if not headline.significant %} — within statistical noise{% endif %}</div>
   </div>
   <div class="tile">
     <div class="v">{{ headline.knee_str }}</div>
@@ -106,6 +152,7 @@
           {% if b.low_conf %}opacity="0.55"{% endif %}
           data-tip="{{ b.tip }}"/>
     <line x1="{{ b.cx }}" x2="{{ b.cx }}" y1="{{ b.ci_top }}" y2="{{ b.ci_bot }}" stroke="var(--ink-muted)" stroke-width="1.5"/>
+    {% if b.clipped %}<text x="{{ b.cx }}" y="{{ b.ci_top - 3 }}" text-anchor="middle">▲</text>{% endif %}
     <text x="{{ b.cx }}" y="275" text-anchor="middle">{{ b.label }}</text>
     {% if b.show_val %}<text class="val" x="{{ b.cx }}" y="{{ b.y - 8 }}" text-anchor="middle">{{ b.val }}</text>{% endif %}
     {% endfor %}
@@ -117,6 +164,44 @@
     <text x="450" y="296" text-anchor="middle">context fill (% of {{ '{:,}'.format(meta.window) }}-token window)</text>
   </svg>
 </div>
+
+{% if models %}
+<div class="card">
+  <h2>By model</h2>
+  <table>
+    <thead><tr><th>Model</th><th>Steps</th><th>Fresh rate</th><th>Deep rate</th><th>Ratio</th><th>Threshold</th><th>Verdict</th></tr></thead>
+    <tbody>
+      {% for m in models %}
+      <tr{% if m.is_other %} class="other"{% endif %}>
+        <td>{{ m.label }}</td><td>{{ m.steps }}</td><td>{{ m.fresh }}</td><td>{{ m.deep }}</td>
+        <td>{{ m.ratio }}</td><td>{{ m.knee }}</td>
+        <td class="v-{{ m.verdict_kind }}">{% if not m.is_other %}{{ m.verdict_icon }} {{ m.verdict_kind }}{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="minis">
+    {% for m in models %}{% if m.mini %}
+    <div class="mini">
+      <h3>{{ m.label }}</h3>
+      <svg viewBox="0 0 280 125" width="100%" role="img" aria-label="Rot curve for {{ m.label }}">
+        <line x1="10" x2="270" y1="100" y2="100" stroke="var(--baseline)" stroke-width="1"/>
+        {% for b in m.mini.bars %}
+        <rect class="mark" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"
+              fill="{% if b.past_knee %}var(--critical){% else %}var(--series-1){% endif %}"
+              {% if b.low_conf %}opacity="0.55"{% endif %}
+              data-tip="{{ m.label }} — {{ b.tip }}"/>
+        {% endfor %}
+        {% if m.mini.knee_x %}
+        <line x1="{{ m.mini.knee_x }}" x2="{{ m.mini.knee_x }}" y1="10" y2="100" stroke="var(--critical)" stroke-width="1" stroke-dasharray="4 3"/>
+        {% endif %}
+        <text x="140" y="118" text-anchor="middle">context fill 0–100% (shared scale)</text>
+      </svg>
+    </div>
+    {% endif %}{% endfor %}
+  </div>
+</div>
+{% endif %}
 
 <div class="card">
   <h2>Where your context goes (estimated)</h2>
@@ -140,6 +225,50 @@
   </ol>
 </div>
 {% endif %}
+
+<div class="card share-wrap">
+  <h2>Share card</h2>
+  {# Pure-SVG card, fixed dark palette, literal hex colors (CSS vars don't
+     survive serialization). Deliberately NO xmlns attribute here: the report
+     must contain no absolute-URL substrings, and XMLSerializer re-adds the
+     SVG namespace automatically when the export script serializes the node.
+     Do not "fix" this by adding xmlns. #}
+  <svg id="share-card" viewBox="0 0 1200 630" width="1200" height="630"
+       font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Arial, sans-serif">
+    <rect x="0" y="0" width="1200" height="630" fill="{{ card.bg }}"/>
+    <rect x="1" y="1" width="1198" height="628" fill="none" stroke="{{ card.grid }}" stroke-width="2" rx="18"/>
+    <text x="60" y="82" fill="{{ card.ink }}" font-size="34" font-weight="700">contextrot</text>
+    <rect x="248" y="52" rx="17" height="38"
+          width="{{ 40 + card.hero.headline_word|length * 12 }}"
+          fill="none" stroke="{{ card.accent }}" stroke-width="2"/>
+    <text x="{{ 268 + card.hero.headline_word|length * 6 }}" y="78" fill="{{ card.accent }}"
+          font-size="19" font-weight="700" letter-spacing="2" text-anchor="middle">{{ card.hero.headline_word }}</text>
+    <text x="60" y="330" fill="{{ card.accent }}" font-size="160" font-weight="800"
+          letter-spacing="-6">{{ card.hero.value }}</text>
+    <text x="60" y="385" fill="{{ card.ink }}" font-size="28" font-weight="600">{{ card.hero.label }}</text>
+    {% for line in card.verdict_lines %}
+    <text x="60" y="{{ 432 + loop.index0 * 32 }}" fill="{{ card.muted }}" font-size="21">{{ line }}</text>
+    {% endfor %}
+    {# mini rot curve, right side #}
+    <line x1="640" x2="1140" y1="470" y2="470" stroke="{{ card.grid }}" stroke-width="2"/>
+    {% for b in card.chart.bars %}
+    <rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="4"
+          fill="{% if b.past_knee %}{{ card.accent }}{% else %}{{ card.bar }}{% endif %}"
+          {% if b.low_conf %}opacity="0.55"{% endif %}/>
+    {% endfor %}
+    {% if card.chart.knee_x %}
+    <line x1="{{ card.chart.knee_x }}" x2="{{ card.chart.knee_x }}" y1="170" y2="470" stroke="{{ card.accent }}" stroke-width="2" stroke-dasharray="8 6"/>
+    {% endif %}
+    <text x="890" y="500" fill="{{ card.muted }}" font-size="18" text-anchor="middle">failure rate by context fill (0–100%)</text>
+    <line x1="60" x2="1140" y1="548" y2="548" stroke="{{ card.grid }}" stroke-width="1"/>
+    <text x="60" y="586" fill="{{ card.muted }}" font-size="20">{{ card.footer }}</text>
+  </svg>
+  <div class="share-actions">
+    <button type="button" id="save-png">Save as PNG</button>
+    <button type="button" id="save-svg" class="ghost">Download SVG</button>
+    <span class="share-note" id="share-note">1200×630 — sized for X/Reddit/OG previews.</span>
+  </div>
+</div>
 
 <div class="card">
   <h2>Bucket data</h2>
@@ -172,6 +301,46 @@ Generated by contextrot v{{ meta.version }}.</p>
     });
     el.addEventListener('mouseleave', function () { tip.style.display = 'none'; });
   });
+
+  function serializeCard() {
+    return new XMLSerializer().serializeToString(document.getElementById('share-card'));
+  }
+  function download(blob, name) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+  function saveSVG() {
+    download(new Blob([serializeCard()], { type: 'image/svg+xml' }), 'contextrot-card.svg');
+  }
+  function savePNG() {
+    var xml = serializeCard();
+    var img = new Image();
+    var W = 2400, H = 1260; // 2x for crispness
+    function fallback() {
+      saveSVG();
+      document.getElementById('share-note').textContent =
+        'PNG export not supported here — saved as SVG instead (drag into any chat/post).';
+    }
+    img.onload = function () {
+      try {
+        var c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        c.getContext('2d').drawImage(img, 0, 0, W, H);
+        c.toBlob(function (blob) {
+          if (blob) download(blob, 'contextrot-card.png'); else fallback();
+        }, 'image/png');
+      } catch (e) { fallback(); }
+    };
+    img.onerror = fallback;
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+  }
+  document.getElementById('save-png').addEventListener('click', savePNG);
+  document.getElementById('save-svg').addEventListener('click', saveSVG);
 })();
 </script>
 </body>

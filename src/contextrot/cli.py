@@ -128,6 +128,21 @@ def main(
                 "ratio_significant": result.curve.ratio_significant,
                 "knee_pct": result.curve.knee_pct,
             },
+            "models": [
+                {
+                    "family": m.family,
+                    "label": m.label,
+                    "steps": m.steps,
+                    "fresh_rate": m.curve.low_fill_rate,
+                    "deep_rate": m.curve.high_fill_rate,
+                    "ratio": _finite_or_none(m.curve.degradation_ratio),
+                    "ratio_significant": m.curve.ratio_significant,
+                    "knee_pct": m.curve.knee_pct,
+                    "verdict": m.verdict_kind,
+                    "other": m.is_other,
+                }
+                for m in result.models
+            ],
             "composition": vars(result.composition),
             "cost": {
                 "total_usd": round(result.total_cost_usd, 2),
@@ -176,9 +191,7 @@ def sessions(
         started = s.started_at.strftime("%Y-%m-%d %H:%M") if s.started_at else "?"
         model = s.steps[0].model if s.steps else "?"
         project_name = _project_basename(s.project) if s.project else "?"
-        table.add_row(
-            started, project_name, str(len(s.steps)), f"{s.peak_prompt_tokens:,}", model
-        )
+        table.add_row(started, project_name, str(len(s.steps)), f"{s.peak_prompt_tokens:,}", model)
     console.print(table)
 
 
