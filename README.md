@@ -28,6 +28,10 @@ pip3 install contextrot
 contextrot
 ```
 
+> **`contextrot: command not found` after pip install?** Your Python scripts
+> directory isn't on `PATH` (common with the stock macOS `python3`). Either use
+> `uvx contextrot` above, or run it PATH-free with `python3 -m contextrot`.
+
 That's it. No config, no API keys, no uploads. contextrot reads the session transcripts your agent CLI already keeps on disk and answers a question no other tool answers:
 
 > **At what context fill does *my* agent start failing, what's causing it, and what is it costing me?**

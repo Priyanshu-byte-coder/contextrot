@@ -4,6 +4,14 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.1.7] - 2026-07-04
+
+### Added
+
+- `python -m contextrot` entry point — runs the tool without needing the pip
+  scripts directory on `PATH` (common friction with the stock macOS `python3`
+  and `pip install --user`). README documents it as the fallback.
+
 ## [0.1.6] - 2026-07-03
 
 ### Fixed
