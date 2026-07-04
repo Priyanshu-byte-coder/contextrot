@@ -127,6 +127,17 @@ An adapter is one small file with a fixture and a test — [it's the paved first
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Most valuable first PR: an adapter for the agent CLI you use.
 
+## Stats
+
+<p>
+  <a href="https://pypistats.org/packages/contextrot"><img src="https://img.shields.io/pypi/dm/contextrot?label=downloads%2Fmonth&color=2a78d6" alt="Downloads per month"></a>
+  <a href="https://pypistats.org/packages/contextrot"><img src="https://img.shields.io/pypi/dw/contextrot?label=downloads%2Fweek&color=2a78d6" alt="Downloads per week"></a>
+  <a href="https://pypistats.org/packages/contextrot"><img src="https://img.shields.io/pypi/dd/contextrot?label=downloads%2Fday&color=2a78d6" alt="Downloads per day"></a>
+</p>
+
+Live dashboards: [pypistats](https://pypistats.org/packages/contextrot) ·
+[clickpy (ClickHouse)](https://clickpy.clickhouse.com/dashboard/contextrot)
+
 ## License
 
 [MIT](LICENSE)
