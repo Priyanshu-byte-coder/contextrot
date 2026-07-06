@@ -115,9 +115,9 @@ contextrot makes **zero network calls**. Local files in, terminal/local HTML out
 | Agent | Status |
 |---|---|
 | Claude Code | ✅ today |
-| OpenCode | 🔄 [community adapter in review](https://github.com/Priyanshu-byte-coder/contextrot/pull/2) |
-| Codex CLI | [adapter wanted — spec'd and ready to pick up](https://github.com/Priyanshu-byte-coder/contextrot/issues) |
-| Gemini CLI | adapter wanted — spec'd and ready to pick up |
+| OpenCode | ✅ today — community-contributed |
+| Codex CLI | [adapter wanted — spec'd and ready to pick up](https://github.com/Priyanshu-byte-coder/contextrot/issues/3) |
+| Gemini CLI | [adapter wanted — spec'd and ready to pick up](https://github.com/Priyanshu-byte-coder/contextrot/issues/4) |
 | OpenTelemetry GenAI spans | planned |
 
 An adapter is one small file with a fixture and a test — [it's the paved first-contribution path](CONTRIBUTING.md).
