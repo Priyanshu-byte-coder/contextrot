@@ -115,8 +115,8 @@ contextrot makes **zero network calls**. Local files in, terminal/local HTML out
 | Agent | Status |
 |---|---|
 | Claude Code | ✅ today |
+| OpenCode | ✅ today |
 | Codex CLI | planned — [adapter wanted](https://github.com/Priyanshu-byte-coder/contextrot/issues) |
-| OpenCode | planned — adapter wanted |
 | Gemini CLI | planned — adapter wanted |
 | OpenTelemetry GenAI spans | planned |
 

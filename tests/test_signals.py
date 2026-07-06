@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from contextrot.adapters.claude_code import ClaudeCodeAdapter
+from contextrot.models import Session, Step, ToolCall
 from contextrot.signals import extract_signals
 
 SESSION_FILE = (
@@ -58,3 +59,29 @@ def test_fill_pct_computed():
 def test_cost_positive():
     steps = _signals()
     assert all(s.cost_usd > 0 for s in steps)
+
+
+def test_tool_name_matching_is_case_insensitive():
+    # Agents disagree on casing: Claude Code capitalizes (Edit/Read), OpenCode
+    # lowercases (edit/read). edit_failure and reread must fire regardless.
+    session = Session(
+        session_id="s",
+        source="opencode",
+        project="p",
+        steps=[
+            Step(timestamp=None, model="claude-sonnet-4-6",
+                 tool_calls=[ToolCall(name="read", tool_use_id="r1",
+                                      target="a.py", result_chars=10)]),
+            Step(timestamp=None, model="claude-sonnet-4-6",
+                 tool_calls=[ToolCall(name="edit", tool_use_id="e1", target="a.py",
+                                      is_error=True, error_text="oldString not found")]),
+            Step(timestamp=None, model="claude-sonnet-4-6",
+                 tool_calls=[ToolCall(name="read", tool_use_id="r2",
+                                      target="a.py", result_chars=10)]),
+        ],
+    )
+    steps = extract_signals(session, WINDOW).steps
+    assert steps[1].edit_failure  # lowercase "edit" error still counts
+    assert steps[1].tool_error
+    assert steps[2].reread  # lowercase "read" of an already-read file
+    assert not steps[0].reread

@@ -24,6 +24,12 @@ in order; ``parse()`` consumes them in the same order (the loader iterates the
 two calls strictly one-to-one). Every returned path is the real database file,
 so the ``--days`` ``path.stat()`` filter still works.
 
+Caveat: because every session shares that one database file, ``--days`` (which
+filters on per-file mtime) keeps all historical sessions whenever the database
+has been touched recently — it does not filter by individual session age.
+Nothing breaks; the whole history is simply analyzed. Proper session-level date
+filtering would be a loader-side change.
+
 Parsing is tolerant by design: unknown fields are ignored, malformed JSON rows
 are skipped, and a partially parsed session beats a crash. Reads are local and
 read-only; no network access.

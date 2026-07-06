@@ -7,15 +7,19 @@ well as combined, so one noisy signal can't silently dominate the analysis.
 Signals:
 
 - tool_error:       any tool call in the step returned is_error
-- edit_failure:     an editing tool (Edit/Write/MultiEdit/NotebookEdit)
+- edit_failure:     an editing tool (edit/write/multiedit/notebookedit/…)
                     returned is_error — the strongest "agent lost the plot"
                     signal for coding agents
 - retry:            the step repeats a (tool, target) pair that errored in a
                     recent previous step
-- reread:           the step re-Reads a file already read earlier in the
+- reread:           the step re-reads a file already read earlier in the
                     session (a proxy for the model losing track of context
                     it already had)
 - self_correction:  assistant text contains apology/correction language
+
+Tool-name matching is case-insensitive so agents with differing conventions
+are covered uniformly — Claude Code capitalizes (``Edit``, ``Read``) while
+OpenCode lowercases (``edit``, ``read``).
 """
 
 from __future__ import annotations
@@ -25,8 +29,17 @@ from dataclasses import dataclass, field
 
 from contextrot.models import Session
 
-EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit", "str_replace_editor", "apply_patch"}
-READ_TOOLS = {"Read", "NotebookRead"}
+# Matched case-insensitively (see _norm below), so entries are lowercase.
+EDIT_TOOLS = {
+    "edit",
+    "write",
+    "multiedit",
+    "notebookedit",
+    "str_replace_editor",
+    "apply_patch",
+    "patch",
+}
+READ_TOOLS = {"read", "notebookread"}
 
 _SELF_CORRECTION = re.compile(
     r"\b("
@@ -112,9 +125,13 @@ def extract_signals(session: Session, context_window: int) -> SessionSignals:
         )
 
         for call in step.tool_calls:
+            # Case-insensitive tool-name matching (Claude Code capitalizes,
+            # OpenCode lowercases). The retry key keeps the raw name — it only
+            # needs to be self-consistent within a session.
+            name = call.name.lower()
             key = (call.name, call.target or "")
 
-            if call.name in READ_TOOLS and call.target:
+            if name in READ_TOOLS and call.target:
                 if call.target in files_read:
                     sig.reread = True
                 files_read.add(call.target)
@@ -127,7 +144,7 @@ def extract_signals(session: Session, context_window: int) -> SessionSignals:
 
             if call.is_error:
                 sig.tool_error = True
-                if call.name in EDIT_TOOLS:
+                if name in EDIT_TOOLS:
                     sig.edit_failure = True
                 if call.target:
                     recent_errors[key] = i

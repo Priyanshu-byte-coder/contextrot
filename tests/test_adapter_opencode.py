@@ -12,6 +12,7 @@ import sqlite3
 from pathlib import Path
 
 from contextrot.adapters.opencode import OpenCodeAdapter
+from contextrot.signals import extract_signals
 
 _SCHEMA = """
 CREATE TABLE project (id TEXT PRIMARY KEY, worktree TEXT NOT NULL);
@@ -264,6 +265,21 @@ def test_session_without_assistant_returns_none(tmp_path: Path):
     adapter = OpenCodeAdapter()
     paths = adapter.discover(tmp_path)
     assert adapter.parse(paths[0]) is None
+
+
+def test_signals_fire_end_to_end(tmp_path: Path):
+    # The whole point of the adapter: parsed OpenCode data must light up the
+    # signals layer. Guards against tool-name casing regressions (OpenCode's
+    # lowercase `edit`/`read` vs Claude Code's capitalized names).
+    _db(tmp_path)
+    adapter = OpenCodeAdapter()
+    session = adapter.parse(adapter.discover(tmp_path)[0])
+    assert session is not None
+    steps = extract_signals(session, 200_000).steps
+    assert steps[1].edit_failure  # the lowercase failing edit
+    assert steps[1].tool_error
+    assert steps[2].retry  # retried edit on the same file
+    assert steps[2].self_correction  # "I apologize, let me fix that."
 
 
 def test_missing_db_discovers_nothing(tmp_path: Path):
