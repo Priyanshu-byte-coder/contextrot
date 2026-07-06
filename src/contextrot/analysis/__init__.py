@@ -59,6 +59,17 @@ def load_sessions(
             if session is None or len(session.steps) < min_steps:
                 skipped += 1
                 continue
+            # Second, session-level date check: the mtime filter above is only
+            # a cheap pre-filter and is meaningless for adapters that keep many
+            # sessions in one always-fresh file (e.g. OpenCode's single SQLite
+            # DB). Sessions with no timestamps stay included.
+            if cutoff is not None:
+                session_end = session.ended_at or session.started_at
+                try:
+                    if session_end is not None and session_end < cutoff:
+                        continue
+                except TypeError:  # naive timestamp from an adapter — keep it
+                    pass
             if project_filter and project_filter.lower() not in session.project.lower():
                 continue
             sessions.append(session)

@@ -4,6 +4,27 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.3.0] - 2026-07-06
+
+### Added
+
+- **OpenCode adapter** — the first community-contributed adapter, by
+  [@BYK](https://github.com/BYK) ([#2](https://github.com/Priyanshu-byte-coder/contextrot/pull/2)).
+  Reads OpenCode's single SQLite database (`opencode.db`) with real per-step
+  token accounting, embedded tool outcomes, and sub-agent sessions surfaced as
+  sidechain steps. `contextrot` now analyzes Claude Code and OpenCode sessions
+  side by side.
+
+### Fixed
+
+- Tool-name matching in signal extraction is now case-insensitive — OpenCode's
+  lowercase tool names (`edit`, `read`) previously never registered as edit
+  failures or re-reads (part of #2)
+- `--days` now also filters by the parsed session's own timestamps, not just
+  file mtime — with single-database adapters the file is always fresh, so old
+  sessions were never excluded
+  ([#6](https://github.com/Priyanshu-byte-coder/contextrot/issues/6))
+
 ## [0.2.0] - 2026-07-04
 
 ### Added
