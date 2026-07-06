@@ -38,7 +38,8 @@ ruff check src tests
 mypy src
 ```
 
-All three must pass in CI. Python 3.11+ supported.
+All three must pass in CI. Python 3.9–3.13 supported (CI tests the full matrix
+across Linux/macOS/Windows).
 
 ## Style
 

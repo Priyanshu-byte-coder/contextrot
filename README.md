@@ -115,9 +115,9 @@ contextrot makes **zero network calls**. Local files in, terminal/local HTML out
 | Agent | Status |
 |---|---|
 | Claude Code | ✅ today |
-| OpenCode | ✅ today |
-| Codex CLI | planned — [adapter wanted](https://github.com/Priyanshu-byte-coder/contextrot/issues) |
-| Gemini CLI | planned — adapter wanted |
+| OpenCode | ✅ today — community-contributed |
+| Codex CLI | [adapter wanted — spec'd and ready to pick up](https://github.com/Priyanshu-byte-coder/contextrot/issues/3) |
+| Gemini CLI | [adapter wanted — spec'd and ready to pick up](https://github.com/Priyanshu-byte-coder/contextrot/issues/4) |
 | OpenTelemetry GenAI spans | planned |
 
 An adapter is one small file with a fixture and a test — [it's the paved first-contribution path](CONTRIBUTING.md).
@@ -130,7 +130,11 @@ An adapter is one small file with a fixture and a test — [it's the paved first
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Most valuable first PR: an adapter for the agent CLI you use.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Most valuable first PR: an adapter for the agent CLI you use — there are [spec'd, ready-to-pick-up adapter issues](https://github.com/Priyanshu-byte-coder/contextrot/contribute) waiting.
+
+<a href="https://github.com/Priyanshu-byte-coder/contextrot/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Priyanshu-byte-coder/contextrot" alt="Contributors" />
+</a>
 
 ## Stats
 
@@ -143,6 +147,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Most valuable first PR: an adapter for t
 
 Live dashboards: [pypistats](https://pypistats.org/packages/contextrot) ·
 [clickpy (ClickHouse)](https://clickpy.clickhouse.com/dashboard/contextrot)
+
+If contextrot told you something useful about your setup, a ⭐ helps other agent users find it.
+
+<a href="https://www.star-history.com/#Priyanshu-byte-coder/contextrot&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Priyanshu-byte-coder/contextrot&type=Date&theme=dark" />
+    <img src="https://api.star-history.com/svg?repos=Priyanshu-byte-coder/contextrot&type=Date" alt="Star History Chart" width="600" />
+  </picture>
+</a>
 
 ## License
 
