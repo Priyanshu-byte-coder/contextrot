@@ -165,6 +165,21 @@
   </svg>
 </div>
 
+{% if reversal_rows %}
+<div class="card">
+  <h2>Failure-signal rate by prior reversal count</h2>
+  <table>
+    <thead><tr><th>Prior reversals</th><th>Steps</th><th>Degraded</th><th>Rate</th><th>95% CI</th></tr></thead>
+    <tbody>
+      {% for b in reversal_rows %}
+      <tr><td>{{ b.range }}{% if b.low_conf %}*{% endif %}</td><td>{{ b.n }}</td><td>{{ b.degraded }}</td><td>{{ b.rate }}</td><td>{{ b.ci }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="sub" style="margin:0.75rem 0 0">Buckets use reversals observed before the step, so same-step failures do not explain themselves. * fewer than 15 steps.</p>
+</div>
+{% endif %}
+
 {% if models %}
 <div class="card">
   <h2>By model</h2>

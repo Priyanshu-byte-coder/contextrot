@@ -53,6 +53,8 @@ def render(result: AnalysisResult, console: Console | None = None) -> None:
     if curve.total_steps:
         console.print(_rot_curve_table(result))
         console.print()
+        console.print(_reversal_curve_table(result))
+        console.print()
 
     if len([m for m in result.models if not m.is_other]) >= 2:
         console.print(_models_table(result))
@@ -204,6 +206,39 @@ def _rot_curve_table(result: AnalysisResult) -> Table:
 
     if any(b.low_confidence for b in curve.buckets if b.n):
         table.caption = "* fewer than 15 steps in bucket — low confidence"
+    return table
+
+
+def _reversal_curve_table(result: AnalysisResult) -> Table:
+    curve = result.reversal_curve
+    visible = [b for b in curve.buckets if b.n]
+    trusted = [b for b in visible if not b.low_confidence] or visible
+    max_rate = max((b.rate for b in trusted), default=0.0)
+
+    table = Table(
+        title="Failure-signal rate by prior reversal count",
+        show_edge=False,
+        pad_edge=False,
+    )
+    table.add_column("Prior reversals", justify="right", style="cyan")
+    table.add_column("Rate", justify="right")
+    table.add_column("", min_width=BAR_WIDTH, max_width=BAR_WIDTH)
+    table.add_column("n", justify="right", style="dim")
+    table.add_column("95% CI", justify="right", style="dim")
+
+    for b in visible:
+        lo_ci, hi_ci = b.ci
+        rate_txt = f"{b.rate:.0%}" + ("*" if b.low_confidence else "")
+        table.add_row(
+            b.label,
+            rate_txt,
+            Text(_bar(b.rate, max_rate), style="magenta"),
+            str(b.n),
+            f"{lo_ci:.0%}-{hi_ci:.0%}",
+        )
+
+    if any(b.low_confidence for b in visible):
+        table.caption = "* fewer than 15 steps in bucket - low confidence"
     return table
 
 
