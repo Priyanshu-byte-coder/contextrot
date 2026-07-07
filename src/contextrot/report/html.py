@@ -254,6 +254,22 @@ def _context(result: AnalysisResult) -> dict:
             }
         )
 
+    reversal_rows = []
+    for rb in result.reversal_curve.buckets:
+        if rb.n == 0:
+            continue
+        lo_ci, hi_ci = rb.ci
+        reversal_rows.append(
+            {
+                "range": rb.label,
+                "n": rb.n,
+                "degraded": rb.degraded,
+                "rate": f"{rb.rate:.1%}",
+                "ci": f"{lo_ci:.0%}-{hi_ci:.0%}",
+                "low_conf": rb.low_confidence,
+            }
+        )
+
     # Share card: mini curve on the card's own plot rect, fixed hex colors.
     card_chart = _curve_geometry(curve, 640, 1140, 170, 470)
     card = {
@@ -287,5 +303,6 @@ def _context(result: AnalysisResult) -> dict:
         },
         "prescriptions": result.prescriptions,
         "table_rows": table_rows,
+        "reversal_rows": reversal_rows,
         "card": card,
     }

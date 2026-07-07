@@ -10,7 +10,13 @@ from contextrot.adapters import ADAPTERS
 from contextrot.analysis.by_model import ModelStats, build_model_comparison
 from contextrot.analysis.composition import Composition, estimate_composition
 from contextrot.analysis.prescriptions import Prescription, prescribe
-from contextrot.analysis.rot import RotCurve, build_rot_curve, verdict
+from contextrot.analysis.rot import (
+    ReversalCurve,
+    RotCurve,
+    build_reversal_curve,
+    build_rot_curve,
+    verdict,
+)
 from contextrot.models import Session
 from contextrot.pricing import DEFAULT_CONTEXT_WINDOW, context_window_for
 from contextrot.signals import StepSignals, extract_signals
@@ -21,6 +27,7 @@ class AnalysisResult:
     sessions: list[Session]
     steps: list[StepSignals]
     curve: RotCurve
+    reversal_curve: ReversalCurve
     composition: Composition
     prescriptions: list[Prescription]
     context_window: int
@@ -74,7 +81,7 @@ def load_sessions(
                 continue
             sessions.append(session)
 
-    sessions.sort(key=lambda s: (s.started_at or datetime.min.replace(tzinfo=timezone.utc)))
+    sessions.sort(key=lambda s: s.started_at or datetime.min.replace(tzinfo=timezone.utc))
     return sessions, skipped
 
 
@@ -95,6 +102,7 @@ def analyze(
         all_steps.extend(extract_signals(s, session_window).steps)
 
     curve = build_rot_curve(all_steps)
+    reversal_curve = build_reversal_curve(all_steps)
     comp = estimate_composition(sessions, window)
 
     total_cost = sum(st.cost_usd for st in all_steps)
@@ -110,6 +118,7 @@ def analyze(
         sessions=sessions,
         steps=all_steps,
         curve=curve,
+        reversal_curve=reversal_curve,
         composition=comp,
         prescriptions=prescribe(curve, comp, rework_cost, past_knee),
         context_window=window,

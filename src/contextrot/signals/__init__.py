@@ -17,6 +17,11 @@ Signals:
                     it already had)
 - self_correction:  assistant text contains apology/correction language
 
+The reversal counter is separate from the degraded-step composite: it records
+how many correction/retry/repeated-edit-failure events happened before each
+step, so later analysis can ask whether past contradictions predict future
+failures without using the same step's failure as its own explanation.
+
 Tool-name matching is case-insensitive so agents with differing conventions
 are covered uniformly — Claude Code capitalizes (``Edit``, ``Read``) while
 OpenCode lowercases (``edit``, ``read``).
@@ -70,6 +75,8 @@ class StepSignals:
     retry: bool = False
     reread: bool = False
     self_correction: bool = False
+    reversals_so_far: int = 0
+    reversal: bool = False
     cost_usd: float = 0.0
 
     @property
@@ -90,6 +97,8 @@ class StepSignals:
             "fill_pct": round(self.fill_pct, 2),
             "model": self.model,
             **{name: getattr(self, name) for name in SIGNAL_NAMES},
+            "reversals_so_far": self.reversals_so_far,
+            "reversal": self.reversal,
             "degraded": self.degraded,
             "cost_usd": round(self.cost_usd, 6),
         }
@@ -108,6 +117,8 @@ def extract_signals(session: Session, context_window: int) -> SessionSignals:
     # (tool, target) pairs that errored, mapped to the step index of the error.
     recent_errors: dict[tuple[str, str], int] = {}
     files_read: set[str] = set()
+    edited_targets: set[str] = set()
+    reversals_so_far = 0
 
     for i, step in enumerate(session.steps):
         sig = StepSignals(
@@ -115,6 +126,7 @@ def extract_signals(session: Session, context_window: int) -> SessionSignals:
             prompt_tokens=step.prompt_tokens,
             fill_pct=min(100.0, 100.0 * step.prompt_tokens / max(context_window, 1)),
             model=step.model,
+            reversals_so_far=reversals_so_far,
             cost_usd=step_cost_usd(
                 step.input_tokens,
                 step.cache_creation_tokens,
@@ -123,6 +135,7 @@ def extract_signals(session: Session, context_window: int) -> SessionSignals:
                 step.model,
             ),
         )
+        repeat_edit_failure = False
 
         for call in step.tool_calls:
             # Case-insensitive tool-name matching (Claude Code capitalizes,
@@ -135,6 +148,14 @@ def extract_signals(session: Session, context_window: int) -> SessionSignals:
                 if call.target in files_read:
                     sig.reread = True
                 files_read.add(call.target)
+
+            if (
+                name in EDIT_TOOLS
+                and call.target
+                and call.is_error
+                and call.target in edited_targets
+            ):
+                repeat_edit_failure = True
 
             # A repeat of a recently errored (tool, target) is a retry,
             # whether or not this attempt succeeds.
@@ -149,8 +170,15 @@ def extract_signals(session: Session, context_window: int) -> SessionSignals:
                 if call.target:
                     recent_errors[key] = i
 
+            if name in EDIT_TOOLS and call.target:
+                edited_targets.add(call.target)
+
         if step.assistant_text and _SELF_CORRECTION.search(step.assistant_text):
             sig.self_correction = True
+
+        sig.reversal = sig.self_correction or sig.retry or repeat_edit_failure
+        if sig.reversal:
+            reversals_so_far += 1
 
         out.steps.append(sig)
 

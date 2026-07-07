@@ -128,6 +128,21 @@ def main(
                 "ratio_significant": result.curve.ratio_significant,
                 "knee_pct": result.curve.knee_pct,
             },
+            "reversal_curve": {
+                "buckets": [
+                    {
+                        "range": [b.lo, b.hi],
+                        "label": b.label,
+                        "n": b.n,
+                        "degraded": b.degraded,
+                        "rate": round(b.rate, 4),
+                        "ci": [round(x, 4) for x in b.ci],
+                    }
+                    for b in result.reversal_curve.buckets
+                    if b.n
+                ],
+                "total_reversal_events": result.reversal_curve.total_reversal_events,
+            },
             "models": [
                 {
                     "family": m.family,

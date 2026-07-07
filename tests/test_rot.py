@@ -1,4 +1,4 @@
-from contextrot.analysis.rot import build_rot_curve, verdict, wilson_interval
+from contextrot.analysis.rot import build_reversal_curve, build_rot_curve, verdict, wilson_interval
 from contextrot.signals import StepSignals
 
 
@@ -9,6 +9,18 @@ def _step(fill: float, degraded: bool) -> StepSignals:
         fill_pct=fill,
         model="claude-sonnet-4-6",
         tool_error=degraded,
+    )
+
+
+def _step_with_reversals(reversals: int, degraded: bool, reversal: bool = False) -> StepSignals:
+    return StepSignals(
+        step_index=0,
+        prompt_tokens=1000,
+        fill_pct=10.0,
+        model="claude-sonnet-4-6",
+        tool_error=degraded,
+        reversals_so_far=reversals,
+        reversal=reversal,
     )
 
 
@@ -83,3 +95,26 @@ def test_empty_input():
     assert curve.total_steps == 0
     assert curve.degradation_ratio is None
     assert curve.knee_pct is None
+
+
+def test_reversal_curve_buckets_prior_reversal_counts():
+    steps = [
+        _step_with_reversals(0, False, reversal=True),
+        _step_with_reversals(1, True),
+        _step_with_reversals(2, False),
+        _step_with_reversals(3, True),
+        _step_with_reversals(4, False),
+        _step_with_reversals(7, True),
+    ]
+    curve = build_reversal_curve(steps)
+
+    assert curve.total_steps == 6
+    assert curve.total_degraded == 3
+    assert curve.total_reversal_events == 1
+    assert [(b.label, b.n, b.degraded) for b in curve.buckets] == [
+        ("0", 1, 0),
+        ("1", 1, 1),
+        ("2", 1, 0),
+        ("3-4", 2, 1),
+        ("5+", 1, 1),
+    ]

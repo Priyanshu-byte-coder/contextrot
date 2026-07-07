@@ -12,6 +12,18 @@ Sub-agent ("sidechain") traffic runs in its own context window, so it is exclude
 
 For each model call ("step"), context fill is the prompt-side token count — `input_tokens + cache_read_input_tokens + cache_creation_input_tokens` — divided by the model's context window (200k default, `--window` to override). This is the exact size of what the model had to read at that moment, taken from the agent's own accounting, not an estimate.
 
+## Reversal count
+
+Context fill is not the only axis that can explain failures. contextrot also counts session-local reversals: correction/retry events that suggest the working state has become contradictory or has had to be revised.
+
+The reversal proxy for a step is:
+
+- `self_correction`
+- `retry`
+- `edit_failure` on a target that was edited earlier in the same session
+
+Each step is bucketed by the number of reversals that happened **before** that step: 0, 1, 2, 3-4, or 5+. The y-axis is the current step's degraded rate with the same Wilson 95% intervals and low-confidence flag used for the fill curve. This avoids circularity: a same-step failure can increment the reversal count for later steps, but it does not explain itself in the current bucket.
+
 ## Outcome signals
 
 Five per-step signals, each an independent heuristic, each reported separately as well as combined:

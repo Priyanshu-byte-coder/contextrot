@@ -23,6 +23,8 @@ def test_json_output_shape():
     assert len(payload["steps"]) == 5
     assert payload["cost"]["total_usd"] >= 0
     assert any(b["n"] for b in payload["curve"]["buckets"])
+    assert any(b["n"] for b in payload["reversal_curve"]["buckets"])
+    assert payload["reversal_curve"]["total_reversal_events"] >= 0
     # Additive per-model key: always present, empty for the single-model fixture.
     assert payload["models"] == []
 

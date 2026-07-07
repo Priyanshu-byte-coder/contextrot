@@ -19,6 +19,7 @@ LOW_FILL_MAX = 40.0  # "fresh context" zone
 HIGH_FILL_MIN = 60.0  # "deep context" zone
 MIN_BUCKET_N = 15  # buckets below this are shown but marked low-confidence
 KNEE_RATIO = 1.5  # bucket rate vs baseline that marks the degradation knee
+REVERSAL_BUCKETS = [(0, 0), (1, 1), (2, 2), (3, 4), (5, None)]
 
 
 def wilson_interval(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -75,6 +76,46 @@ class RotCurve:
         n = sum(b.n for b in self.buckets if b.lo >= pct)
         d = sum(b.degraded for b in self.buckets if b.lo >= pct)
         return (d / n if n else 0.0, n)
+
+
+@dataclass
+class ReversalBucket:
+    lo: int
+    hi: int | None
+    n: int = 0
+    degraded: int = 0
+
+    @property
+    def label(self) -> str:
+        if self.hi is None:
+            return f"{self.lo}+"
+        if self.lo == self.hi:
+            return str(self.lo)
+        return f"{self.lo}-{self.hi}"
+
+    @property
+    def rate(self) -> float:
+        return self.degraded / self.n if self.n else 0.0
+
+    @property
+    def ci(self) -> tuple[float, float]:
+        return wilson_interval(self.degraded, self.n)
+
+    @property
+    def low_confidence(self) -> bool:
+        return self.n < MIN_BUCKET_N
+
+
+@dataclass
+class ReversalCurve:
+    buckets: list[ReversalBucket]
+    total_steps: int
+    total_degraded: int
+    total_reversal_events: int
+
+    @property
+    def overall_rate(self) -> float:
+        return self.total_degraded / self.total_steps if self.total_steps else 0.0
 
 
 # Minimum steps per zone before the tool is willing to state a verdict.
@@ -181,4 +222,33 @@ def build_rot_curve(steps: list[StepSignals]) -> RotCurve:
         ratio_significant=significant,
         knee_pct=knee,
         signal_totals=signal_totals,
+    )
+
+
+def build_reversal_curve(steps: list[StepSignals]) -> ReversalCurve:
+    """Bucket failures by the number of prior reversals in the same session.
+
+    ``reversals_so_far`` is assigned before the current step's signals are
+    counted, so the bucketed outcome is the later-step failure rate rather than
+    the same-step reversal signal explaining itself.
+    """
+    buckets = [ReversalBucket(lo, hi) for lo, hi in REVERSAL_BUCKETS]
+    total_degraded = 0
+    total_reversal_events = 0
+
+    for s in steps:
+        count = s.reversals_so_far
+        bucket = next(b for b in buckets if count >= b.lo and (b.hi is None or count <= b.hi))
+        bucket.n += 1
+        if s.degraded:
+            bucket.degraded += 1
+            total_degraded += 1
+        if s.reversal:
+            total_reversal_events += 1
+
+    return ReversalCurve(
+        buckets=buckets,
+        total_steps=len(steps),
+        total_degraded=total_degraded,
+        total_reversal_events=total_reversal_events,
     )

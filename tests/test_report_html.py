@@ -3,7 +3,7 @@ from pathlib import Path
 from contextrot.analysis import AnalysisResult
 from contextrot.analysis.by_model import build_model_comparison
 from contextrot.analysis.composition import Composition
-from contextrot.analysis.rot import build_rot_curve, verdict
+from contextrot.analysis.rot import build_reversal_curve, build_rot_curve, verdict
 from contextrot.report.html import _chart_max_rate, render_html
 from contextrot.signals import StepSignals
 
@@ -26,6 +26,7 @@ def _result(steps: list[StepSignals]) -> AnalysisResult:
         sessions=[],
         steps=steps,
         curve=curve,
+        reversal_curve=build_reversal_curve(steps),
         composition=Composition(
             overhead_tokens=30000,
             tool_output_tokens=20000,
