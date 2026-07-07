@@ -24,6 +24,8 @@ The reversal proxy for a step is:
 
 Each step is bucketed by the number of reversals that happened **before** that step: 0, 1, 2, 3-4, or 5+. The y-axis is the current step's degraded rate with the same Wilson 95% intervals and low-confidence flag used for the fill curve. This avoids circularity: a same-step failure can increment the reversal count for later steps, but it does not explain itself in the current bucket.
 
+Two caveats, same observational spirit as the fill axis. Reversal events autocorrelate: one retry loop both raises the counter and supplies several nearby failures, so a burst can manufacture its own slope. And the counter never resets within a session, so the 5+ bucket skews toward long sessions — steps there are also later-in-task steps, the same confounder the fill axis carries. Read the reversal curve as a complementary lens, not an independent experiment.
+
 ## Outcome signals
 
 Five per-step signals, each an independent heuristic, each reported separately as well as combined:

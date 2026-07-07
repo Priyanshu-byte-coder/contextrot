@@ -4,6 +4,24 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.4.0] - 2026-07-07
+
+### Added
+
+- **Reversal-count axis** — community contribution by
+  [@Muhtasim-Munif-Fahim](https://github.com/Muhtasim-Munif-Fahim)
+  ([#7](https://github.com/Priyanshu-byte-coder/contextrot/pull/7), closes
+  [#5](https://github.com/Priyanshu-byte-coder/contextrot/issues/5)).
+  Failure rate is now also correlated against how many session-local
+  reversals (self-corrections, retries, repeated edit failures on an
+  already-edited file) happened *before* each step — the "rot is what's in
+  the context, not how full it is" hypothesis, measurable on your own data.
+  New table in terminal and HTML reports, additive `reversal_curve` key in
+  `--json`, and per-step `reversals_so_far`/`reversal` fields. Buckets use
+  prior-step counts only, so a failure never explains itself.
+- Methodology notes for the reversal axis, including its confounders
+  (reversal bursts autocorrelate; the 5+ bucket skews toward long sessions)
+
 ## [0.3.0] - 2026-07-06
 
 ### Added

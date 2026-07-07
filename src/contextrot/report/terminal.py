@@ -21,16 +21,17 @@ def _bar(rate: float, max_rate: float, width: int = BAR_WIDTH) -> str:
     return "█" * filled
 
 
-def _curve_max_rate(curve: RotCurve) -> float:
+def _curve_max_rate(buckets: list) -> float:
     """Bar scale: ignore low-confidence buckets so a noisy 4-step bucket
-    can't flatten the real bars (parity with the HTML chart)."""
-    visible = [b for b in curve.buckets if b.n]
+    can't flatten the real bars (parity with the HTML chart). Works for any
+    bucket kind with n/rate/low_confidence (fill and reversal curves)."""
+    visible = [b for b in buckets if b.n]
     trusted = [b for b in visible if not b.low_confidence] or visible
     return max((b.rate for b in trusted), default=0.0)
 
 
 def _sparkline(curve: RotCurve) -> str:
-    max_rate = _curve_max_rate(curve)
+    max_rate = _curve_max_rate(curve.buckets)
     if max_rate <= 0:
         return ""
     out = []
@@ -176,7 +177,7 @@ def _headline(result: AnalysisResult) -> Panel:
 
 def _rot_curve_table(result: AnalysisResult) -> Table:
     curve = result.curve
-    max_rate = _curve_max_rate(curve)
+    max_rate = _curve_max_rate(curve.buckets)
 
     table = Table(
         title="Failure-signal rate by context fill",
@@ -212,8 +213,7 @@ def _rot_curve_table(result: AnalysisResult) -> Table:
 def _reversal_curve_table(result: AnalysisResult) -> Table:
     curve = result.reversal_curve
     visible = [b for b in curve.buckets if b.n]
-    trusted = [b for b in visible if not b.low_confidence] or visible
-    max_rate = max((b.rate for b in trusted), default=0.0)
+    max_rate = _curve_max_rate(curve.buckets)
 
     table = Table(
         title="Failure-signal rate by prior reversal count",
