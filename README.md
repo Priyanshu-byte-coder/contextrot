@@ -132,6 +132,8 @@ An adapter is one small file with a fixture and a test — [it's the paved first
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Most valuable first PR: an adapter for the agent CLI you use — there are [spec'd, ready-to-pick-up adapter issues](https://github.com/Priyanshu-byte-coder/contextrot/contribute) waiting.
 
+Ran the tool? [Share your rot curve](https://github.com/Priyanshu-byte-coder/contextrot/discussions/8) — flat curves count too.
+
 <a href="https://github.com/Priyanshu-byte-coder/contextrot/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=Priyanshu-byte-coder/contextrot" alt="Contributors" />
 </a>
