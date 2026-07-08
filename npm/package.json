@@ -1,0 +1,35 @@
+{
+  "name": "contextrot",
+  "version": "0.4.0",
+  "description": "Find out where your coding agent starts degrading. Personal context-rot analytics from your own agent sessions. (npm wrapper around the Python CLI — always runs the latest PyPI release via uv.)",
+  "bin": {
+    "contextrot": "bin/contextrot.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "engines": {
+    "node": ">=14"
+  },
+  "license": "MIT",
+  "author": "Priyanshu Doshi",
+  "homepage": "https://github.com/Priyanshu-byte-coder/contextrot",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Priyanshu-byte-coder/contextrot.git",
+    "directory": "npm"
+  },
+  "bugs": {
+    "url": "https://github.com/Priyanshu-byte-coder/contextrot/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "opencode",
+    "context-rot",
+    "context-engineering",
+    "llm",
+    "agents",
+    "developer-tools",
+    "cli"
+  ]
+}
