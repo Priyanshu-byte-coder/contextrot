@@ -2,18 +2,22 @@ from pathlib import Path
 
 from contextrot.analysis import AnalysisResult
 from contextrot.analysis.by_model import build_model_comparison
+from contextrot.analysis.by_project import build_project_comparison
 from contextrot.analysis.composition import Composition
 from contextrot.analysis.rot import build_reversal_curve, build_rot_curve, verdict
 from contextrot.report.html import _chart_max_rate, render_html
 from contextrot.signals import StepSignals
 
 
-def _step(fill: float, degraded: bool, model: str = "claude-opus-4-8") -> StepSignals:
+def _step(
+    fill: float, degraded: bool, model: str = "claude-opus-4-8", project: str = ""
+) -> StepSignals:
     return StepSignals(
         step_index=0,
         prompt_tokens=int(fill * 2000),
         fill_pct=fill,
         model=model,
+        project=project,
         tool_error=degraded,
         cost_usd=0.01,
     )
@@ -44,6 +48,7 @@ def _result(steps: list[StepSignals]) -> AnalysisResult:
         verdict_kind=kind,
         verdict_text=text,
         models=build_model_comparison(steps),
+        projects=build_project_comparison(steps),
     )
 
 
@@ -113,3 +118,23 @@ def test_model_section_present_with_two_models(tmp_path: Path):
 def test_model_section_absent_with_one_model(tmp_path: Path):
     html = _render(_result(_mixed_steps()), tmp_path)
     assert "By model" not in html
+
+
+def test_project_section_present_with_two_projects(tmp_path: Path):
+    steps = [
+        _step(f, i % 10 == 0, project="/home/me/proj-a")
+        for i, f in enumerate([15.0, 75.0] * 100)
+    ]
+    steps += [
+        _step(f, i % 25 == 0, project="/home/me/proj-b")
+        for i, f in enumerate([15.0, 75.0] * 100)
+    ]
+    html = _render(_result(steps), tmp_path)
+    assert "By project" in html
+    assert "proj-a" in html and "proj-b" in html
+    assert "http://" not in html
+
+
+def test_project_section_absent_with_one_project(tmp_path: Path):
+    html = _render(_result(_mixed_steps()), tmp_path)
+    assert "By project" not in html

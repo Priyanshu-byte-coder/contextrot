@@ -214,6 +214,30 @@ def _context(result: AnalysisResult) -> dict:
                 }
             )
 
+    # Per-project comparison: same shared-y-scale treatment as models.
+    projects = []
+    real_projects = [p for p in result.projects if not p.is_other]
+    if len(real_projects) >= 2:
+        shared_max = max(_chart_max_rate(p.curve.buckets) for p in real_projects)
+        for p in result.projects:
+            mini = None
+            if not p.is_other:
+                mini = _curve_geometry(p.curve, 10, 270, 10, 100, max_rate=shared_max)
+            projects.append(
+                {
+                    "label": p.label,
+                    "steps": p.steps,
+                    "fresh": _fmt_rate(p.curve.low_fill_rate),
+                    "deep": _fmt_rate(p.curve.high_fill_rate),
+                    "ratio": _fmt_ratio(p.curve.degradation_ratio),
+                    "knee": (f"~{p.curve.knee_pct}%" if p.curve.knee_pct is not None else "none"),
+                    "verdict_kind": p.verdict_kind,
+                    "verdict_icon": icons.get(p.verdict_kind, ""),
+                    "is_other": p.is_other,
+                    "mini": mini,
+                }
+            )
+
     comp = result.composition
     comp_rows_src = [
         ("Startup overhead (avg)", comp.overhead_tokens),
@@ -296,6 +320,7 @@ def _context(result: AnalysisResult) -> dict:
         "hero": hero,
         "chart": chart,
         "models": models,
+        "projects": projects,
         "comp": {
             "rows": comp_rows,
             "height": 10 + len(comp_rows) * 30 + 10,

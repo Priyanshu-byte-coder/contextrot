@@ -70,6 +70,7 @@ class StepSignals:
     prompt_tokens: int
     fill_pct: float
     model: str
+    project: str = ""
     tool_error: bool = False
     edit_failure: bool = False
     retry: bool = False
@@ -96,6 +97,7 @@ class StepSignals:
             "prompt_tokens": self.prompt_tokens,
             "fill_pct": round(self.fill_pct, 2),
             "model": self.model,
+            "project": self.project,
             **{name: getattr(self, name) for name in SIGNAL_NAMES},
             "reversals_so_far": self.reversals_so_far,
             "reversal": self.reversal,
@@ -126,6 +128,7 @@ def extract_signals(session: Session, context_window: int) -> SessionSignals:
             prompt_tokens=step.prompt_tokens,
             fill_pct=min(100.0, 100.0 * step.prompt_tokens / max(context_window, 1)),
             model=step.model,
+            project=session.project,
             reversals_so_far=reversals_so_far,
             cost_usd=step_cost_usd(
                 step.input_tokens,

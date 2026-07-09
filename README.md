@@ -76,6 +76,8 @@ Statistics are kept honest: Wilson 95% confidence intervals, per-signal breakdow
 
 Use more than one model? The report also compares them head-to-head — an independent rot curve and verdict per model family (Opus vs Sonnet vs Haiku), on a shared scale, so you can see which model degrades first *for your workload*.
 
+Work across several repos? `contextrot projects` does the same head-to-head by **project** — an independent rot curve and verdict per working directory, ranked by size, so the specific repo whose CLAUDE.md or MCP setup is dragging you down stops hiding inside your all-projects average.
+
 ## Commands
 
 ```bash
@@ -87,6 +89,7 @@ contextrot --html report.html   # shareable single-file report (still 100% local
                                 #   post it; and a per-model comparison when you
                                 #   use more than one model
 contextrot --json               # every number, recomputable
+contextrot projects             # rank your projects — which repo rots first
 contextrot sessions             # list what was parsed
 ```
 
