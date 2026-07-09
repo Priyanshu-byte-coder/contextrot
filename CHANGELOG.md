@@ -4,6 +4,23 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.5.0] - 2026-07-09
+
+### Added
+
+- **Per-project comparison** — a new grouping axis alongside the per-model one.
+  contextrot now builds an independent rot curve + verdict for each project
+  (working directory) it finds, so you can see *which repo degrades first*
+  instead of only an all-projects average. New `contextrot projects` subcommand
+  prints the ranked breakdown (Project · Steps · Fresh · Deep · Ratio ·
+  Threshold · Verdict); the same table and small-multiple charts appear in the
+  default terminal report and the HTML report when at least two projects clear
+  the 150-step floor. Projects under that floor fold into a single "Other" row.
+- Additive `projects` key in `--json` (mirrors `models`) and a per-step
+  `project` field. Projects are grouped by full working-directory path, so two
+  different directories that share a leaf name stay separate; the display label
+  is the basename.
+
 ## [0.4.0] - 2026-07-07
 
 ### Added

@@ -23,3 +23,7 @@ htmlcov/
 Thumbs.db
 .idea/
 .vscode/
+
+# npm wrapper install artifacts (wrapper has zero runtime deps)
+npm/node_modules/
+npm/package-lock.json
