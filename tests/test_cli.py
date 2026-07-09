@@ -72,3 +72,42 @@ def test_projects_subcommand_insufficient(tmp_path: Path):
 def test_no_sessions_exit_code(tmp_path: Path):
     result = runner.invoke(app, ["--data-dir", str(tmp_path)])
     assert result.exit_code == 1
+
+
+def _fix_config(tmp_path: Path) -> Path:
+    cfg = tmp_path / "claude.json"
+    cfg.write_text(
+        json.dumps({"mcpServers": {"unused_server": {"command": "x"}}, "projects": {}}),
+        encoding="utf-8",
+    )
+    return cfg
+
+
+def test_fix_dry_run_writes_nothing(tmp_path: Path):
+    cfg = _fix_config(tmp_path)
+    before = cfg.read_text(encoding="utf-8")
+    result = runner.invoke(
+        app,
+        ["fix", "--data-dir", str(FIXTURES), "--days", "0", "--config", str(cfg)],
+    )
+    assert result.exit_code == 0
+    assert "unused_server" in result.output
+    assert "--apply" in result.output
+    # The demo fixture never calls unused_server, so it is flagged — but dry run
+    # must not touch the config, and must not leave a backup behind.
+    assert cfg.read_text(encoding="utf-8") == before
+    assert not (tmp_path / "claude.json.contextrot.bak").exists()
+
+
+def test_fix_apply_disables_with_backup(tmp_path: Path):
+    cfg = _fix_config(tmp_path)
+    result = runner.invoke(
+        app,
+        ["fix", "--data-dir", str(FIXTURES), "--days", "0", "--config", str(cfg), "--apply"],
+        input="y\n",
+    )
+    assert result.exit_code == 0
+    data = json.loads(cfg.read_text(encoding="utf-8"))
+    assert "unused_server" not in data["mcpServers"]
+    assert "unused_server" in data["contextrotDisabledMcpServers"]
+    assert (tmp_path / "claude.json.contextrot.bak").exists()

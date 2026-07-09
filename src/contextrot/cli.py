@@ -18,6 +18,11 @@ from rich.table import Table
 from contextrot import __version__
 from contextrot.analysis import analyze, load_sessions
 from contextrot.analysis.by_project import build_project_comparison, project_label
+from contextrot.analysis.fixes import (
+    claude_md_report,
+    disable_global_servers,
+    unused_mcp_servers,
+)
 
 # Windows consoles often default to a legacy codepage that can't encode the
 # box-drawing characters Rich uses; force UTF-8 where the stream supports it.
@@ -276,6 +281,110 @@ def projects(
             verdict_cell = f"[{_style[p.verdict_kind]}]{_icon[p.verdict_kind]} {p.verdict_kind}[/]"
         table.add_row(p.label, str(p.steps), fresh, deep, ratio_s, knee_s, verdict_cell)
     console.print(table)
+
+
+@app.command()
+def fix(
+    data_dir: DataDir = None,
+    days: Days = 30,
+    window: Window = None,
+    apply: Annotated[
+        bool,
+        typer.Option(
+            "--apply",
+            help="Actually disable unused global MCP servers (backs up the config first). "
+            "Without this, fix is a dry run and writes nothing.",
+        ),
+    ] = False,
+    config: Annotated[
+        Optional[Path],
+        typer.Option("--config", help="Path to Claude Code config (default: ~/.claude.json)."),
+    ] = None,
+) -> None:
+    """Turn the report's prescriptions into concrete, checkable actions.
+
+    Dry-run by default: it inspects your config and prints what it would change,
+    writing nothing. Pass --apply to disable unused *global* MCP servers (moved
+    to a reversible stash after a full backup, with a y/N prompt per server).
+    Per-project servers and CLAUDE.md are reported only, never auto-edited.
+    """
+    claude_json = config or (Path.home() / ".claude.json")
+    claude_md = Path.home() / ".claude" / "CLAUDE.md"
+
+    result = analyze(data_dir=data_dir, project_filter=None, days=days, window_override=window)
+    if not result.sessions:
+        console.print("[yellow]No sessions found.[/yellow] Nothing to prescribe.")
+        raise typer.Exit(code=1)
+
+    # 1. The existing prescriptions, as-is.
+    if result.prescriptions:
+        console.print("[bold]Prescriptions from your data[/bold]")
+        for i, p in enumerate(result.prescriptions, 1):
+            console.print(f"  [yellow]{i}. {p.title}[/yellow]")
+            console.print(f"     {p.detail}")
+        console.print()
+
+    # 2. CLAUDE.md size (report only — never auto-edited).
+    md = claude_md_report(claude_md)
+    if md is not None:
+        console.print(
+            f"[bold]Global CLAUDE.md[/bold]: ~{md.token_estimate:,} tokens "
+            f"({md.chars:,} chars) loaded before your first word, every session — "
+            f"{md.path}"
+        )
+        console.print("  Trim stale sections by hand; contextrot never rewrites your prose.")
+        console.print()
+
+    # 3. Unused MCP servers.
+    unused = unused_mcp_servers(result.sessions, claude_json)
+    if not unused.any:
+        console.print(
+            "[green]No unused MCP servers found[/green] "
+            "(every configured server had at least one tool call in this window)."
+        )
+        raise typer.Exit(code=0)
+
+    if unused.project_unused:
+        console.print(
+            "[bold]Project-scoped MCP servers unused this window[/bold] "
+            "(reported only — remove with the Claude CLI if you agree):"
+        )
+        for srv in unused.project_unused:
+            console.print(
+                f"  [cyan]{srv.name}[/cyan]  in {project_label(srv.source)}  →  "
+                f"[dim]claude mcp remove {srv.name}[/dim]"
+            )
+        console.print()
+
+    if not unused.global_unused:
+        raise typer.Exit(code=0)
+
+    names = [s.name for s in unused.global_unused]
+    console.print(
+        f"[bold]Global MCP servers unused this window[/bold]: {', '.join(names)}"
+    )
+    if not apply:
+        console.print(
+            "  [dim]Dry run.[/dim] Re-run with [bold]--apply[/bold] to disable these "
+            "(moved to a reversible stash after a full backup). Nothing was written."
+        )
+        raise typer.Exit(code=0)
+
+    to_disable = []
+    for name in names:
+        if typer.confirm(f"Disable global MCP server '{name}'?", default=False):
+            to_disable.append(name)
+    if not to_disable:
+        console.print("Nothing disabled.")
+        raise typer.Exit(code=0)
+
+    backup, moved = disable_global_servers(claude_json, to_disable)
+    console.print(f"[green]Disabled:[/green] {', '.join(moved)}")
+    console.print(f"  Backup written: {backup}")
+    console.print(
+        "  Undo: restore the backup, or move the entries back from "
+        "'contextrotDisabledMcpServers' to 'mcpServers'."
+    )
 
 
 if __name__ == "__main__":

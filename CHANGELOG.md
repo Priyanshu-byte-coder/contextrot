@@ -4,6 +4,30 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.6.0] - 2026-07-09
+
+### Added
+
+- **`contextrot fix`** — turns the report's prescriptions into concrete,
+  checkable actions. **Dry run by default**: it lists your prescriptions, the
+  size of the global CLAUDE.md loaded before your first word, and any MCP
+  servers configured but never actually called in the analyzed window (their
+  tool schemas sit in every session's startup overhead for nothing) — and
+  writes nothing.
+- **`contextrot fix --apply`** disables *unused global* MCP servers, with a
+  y/N prompt per server. It writes a full `.contextrot.bak` backup first, then
+  moves each server from `mcpServers` into a reversible
+  `contextrotDisabledMcpServers` stash — nothing is deleted and the rest of the
+  config (per-project tree, all other keys) is left byte-untouched. Undo by
+  restoring the backup or moving the entries back.
+- Unused **project-scoped** MCP servers and CLAUDE.md are **reported only**,
+  never auto-edited — the former with the exact `claude mcp remove` command to
+  run yourself, the latter because contextrot never rewrites your prose.
+- Detection is derived entirely from local data: used servers come from
+  `mcp__<server>__` tool-call prefixes in your transcripts, configured servers
+  from `~/.claude.json`. A server is judged unused only if *no* analyzed session
+  used it, so a server you rely on anywhere is never flagged.
+
 ## [0.5.0] - 2026-07-09
 
 ### Added

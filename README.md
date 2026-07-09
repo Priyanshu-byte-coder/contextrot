@@ -90,6 +90,9 @@ contextrot --html report.html   # shareable single-file report (still 100% local
                                 #   use more than one model
 contextrot --json               # every number, recomputable
 contextrot projects             # rank your projects — which repo rots first
+contextrot fix                  # dry-run: prescriptions + unused MCP servers +
+                                #   CLAUDE.md size. Add --apply to disable unused
+                                #   *global* MCP servers (backs up first, reversible)
 contextrot sessions             # list what was parsed
 ```
 
@@ -130,7 +133,7 @@ An adapter is one small file with a fixture and a test — [it's the paved first
 
 ## Roadmap
 
-- `contextrot fix` — apply prescriptions interactively (disable unused MCP servers, trim CLAUDE.md) with before/after measurement
+- ✅ `contextrot fix` — shipped in 0.6.0: dry-run prescriptions + unused-MCP-server detection, with `--apply` to disable unused global servers (reversible, backed up). Next: before/after measurement and CLAUDE.md-section suggestions.
 - More agent adapters + OTel ingestion
 - Opt-in, anonymized aggregate stats → the **State of Context Rot** report: real-workload degradation curves across the community (off by default, aggregate-only, documented schema)
 
