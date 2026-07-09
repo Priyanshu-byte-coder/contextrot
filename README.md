@@ -14,6 +14,9 @@
   <a href="https://github.com/Priyanshu-byte-coder/contextrot/actions/workflows/ci.yml"><img src="https://github.com/Priyanshu-byte-coder/contextrot/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2a78d6" alt="License: MIT"></a>
 </p>
+<p align="center">
+<a href="https://www.producthunt.com/products/github-437?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-contextrot" target="_blank" rel="noopener noreferrer"><img alt="ContextRot - Find out where your coding agent starts degrading. | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1191118&amp;theme=light&amp;t=1783604341957"></a>
+</p>
 
 ## Quick start
 
