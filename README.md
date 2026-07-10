@@ -123,7 +123,8 @@ contextrot makes **zero network calls**. Local files in, terminal/local HTML out
 | Claude Code | ✅ today |
 | OpenCode | ✅ today — community-contributed |
 | Codex CLI | ✅ today |
-| Gemini CLI | [adapter wanted — spec'd and ready to pick up](https://github.com/Priyanshu-byte-coder/contextrot/issues/4) |
+| Gemini CLI | ✅ today |
+| Qwen Code | ✅ today — same recording format as Gemini CLI |
 | OpenTelemetry GenAI spans | planned |
 
 An adapter is one small file with a fixture and a test — [it's the paved first-contribution path](CONTRIBUTING.md).

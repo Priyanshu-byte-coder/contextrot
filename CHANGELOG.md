@@ -4,6 +4,25 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.6.2] - 2026-07-10
+
+### Added
+
+- **Gemini CLI adapter** (closes
+  [#4](https://github.com/Priyanshu-byte-coder/contextrot/issues/4)) — reads
+  session recordings under `~/.gemini/tmp/<project-hash>/chats/`, supporting
+  both the current JSONL stream (including `$set` metadata patches and
+  `$rewindTo` rollbacks) and the legacy single-JSON `ConversationRecord`.
+  Per-call token accounting comes from each gemini message's `tokens` summary
+  (cached prefix split out of `input` so context fill is never double
+  counted; `thoughts` tokens counted as output), tool calls from `toolCalls`
+  records with `status: "error"` detection, and the project from the
+  session's recorded `directories`. Sub-agent recordings (`kind: "subagent"`)
+  are excluded, mirroring sidechain handling elsewhere.
+- **Qwen Code support** — Qwen Code is a Gemini CLI fork with the same
+  recording format; `~/.qwen/tmp/` is scanned automatically and its sessions
+  are labeled `qwen-code` so the two CLIs stay distinguishable.
+
 ## [0.6.1] - 2026-07-10
 
 ### Added
