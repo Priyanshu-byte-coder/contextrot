@@ -4,6 +4,31 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.6.3] - 2026-07-10
+
+### Added
+
+- **Cline, Roo Code, and Kilo Code adapter** — one adapter for the Cline
+  family of VS Code extensions. Task directories are discovered in the
+  global storage of every common host editor (VS Code, VS Code Insiders,
+  VSCodium, Cursor, Windsurf); sessions are labeled `cline`, `roo-code`, or
+  `kilo-code` by publisher. Token accounting comes from each task's
+  `api_req_started` UI entries (Anthropic-style `tokensIn`/`tokensOut`/
+  `cacheWrites`/`cacheReads`, mapped straight through); tool calls are
+  parsed from the XML-style tags these extensions embed in assistant text,
+  with outcomes judged from the `[tool ...] Result:` blocks in the following
+  user message (documented as heuristic — the format records no status
+  flag). Project identity comes from the announced workspace directory,
+  falling back to Roo's `history_item.json`.
+
+### Changed
+
+- Edit/read tool-name coverage in signal extraction now includes every
+  supported agent's native names (`replace`, `write_file`, `write_to_file`,
+  `replace_in_file`, `apply_diff`, `insert_content`, `search_and_replace`,
+  `edit_file`, `read_file`, `read_many_files`) — Gemini CLI and Cline-family
+  edit failures now register as edit failures, not just generic tool errors.
+
 ## [0.6.2] - 2026-07-10
 
 ### Added

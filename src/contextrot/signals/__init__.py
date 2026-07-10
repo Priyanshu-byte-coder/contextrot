@@ -35,6 +35,10 @@ from dataclasses import dataclass, field
 from contextrot.models import Session
 
 # Matched case-insensitively (see _norm below), so entries are lowercase.
+# Covers each supported agent's native names: Claude Code (Edit/Write),
+# OpenCode (edit/write), Codex (apply_patch), Gemini CLI/Qwen Code
+# (replace/write_file/edit), Cline/Roo Code/Kilo Code (replace_in_file/
+# write_to_file/apply_diff/...).
 EDIT_TOOLS = {
     "edit",
     "write",
@@ -43,8 +47,16 @@ EDIT_TOOLS = {
     "str_replace_editor",
     "apply_patch",
     "patch",
+    "replace",
+    "write_file",
+    "write_to_file",
+    "replace_in_file",
+    "apply_diff",
+    "insert_content",
+    "search_and_replace",
+    "edit_file",
 }
-READ_TOOLS = {"read", "notebookread"}
+READ_TOOLS = {"read", "notebookread", "read_file", "read_many_files"}
 
 _SELF_CORRECTION = re.compile(
     r"\b("

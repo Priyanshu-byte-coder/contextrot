@@ -125,6 +125,9 @@ contextrot makes **zero network calls**. Local files in, terminal/local HTML out
 | Codex CLI | ✅ today |
 | Gemini CLI | ✅ today |
 | Qwen Code | ✅ today — same recording format as Gemini CLI |
+| Cline (VS Code) | ✅ today |
+| Roo Code (VS Code) | ✅ today |
+| Kilo Code (VS Code) | ✅ today |
 | OpenTelemetry GenAI spans | planned |
 
 An adapter is one small file with a fixture and a test — [it's the paved first-contribution path](CONTRIBUTING.md).

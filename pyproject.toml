@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "contextrot"
-version = "0.6.2"
+version = "0.6.3"
 description = "Find out where your coding agent starts degrading. Personal context-rot analytics from your own agent sessions."
 readme = "README.md"
 license = { text = "MIT" }
