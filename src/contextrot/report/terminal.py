@@ -65,6 +65,10 @@ def render(result: AnalysisResult, console: Console | None = None) -> None:
         console.print(_projects_table(result))
         console.print()
 
+    if len([a for a in result.agents if not a.is_other]) >= 2:
+        console.print(_agents_table(result))
+        console.print()
+
     console.print(_composition_panel(result))
     console.print()
 
@@ -280,6 +284,50 @@ def _models_table(result: AnalysisResult) -> Table:
         table.add_row(
             Text(m.label, style=row_style or "cyan"),
             str(m.steps),
+            fmt_rate(c.low_fill_rate),
+            fmt_rate(c.high_fill_rate),
+            ratio_s,
+            knee_s,
+            verdict_cell,
+            style=row_style or None,
+        )
+    return table
+
+
+def _agents_table(result: AnalysisResult) -> Table:
+    table = Table(title="By agent", show_edge=False, pad_edge=False)
+    table.add_column("Agent", style="cyan")
+    table.add_column("Steps", justify="right", style="dim")
+    table.add_column("Fresh", justify="right")
+    table.add_column("Deep", justify="right")
+    table.add_column("Ratio", justify="right")
+    table.add_column("Threshold", justify="right")
+    table.add_column("Verdict")
+
+    def fmt_rate(r: float | None) -> str:
+        return f"{r:.1%}" if r is not None else "n/a"
+
+    for a in result.agents:
+        c = a.curve
+        ratio = c.degradation_ratio
+        if ratio is None:
+            ratio_s = "n/a"
+        elif ratio == float("inf"):
+            ratio_s = "∞"
+        else:
+            ratio_s = f"{ratio:.1f}×"
+        knee_s = f"~{c.knee_pct}%" if c.knee_pct is not None else "none"
+        if a.is_other:
+            verdict_cell = Text("—", style="dim")
+        else:
+            verdict_cell = Text(
+                _VERDICT_ICON[a.verdict_kind] + a.verdict_kind,
+                style=_VERDICT_STYLE[a.verdict_kind],
+            )
+        row_style = "dim" if a.is_other else ""
+        table.add_row(
+            Text(a.label, style=row_style or "cyan"),
+            str(a.steps),
             fmt_rate(c.low_fill_rate),
             fmt_rate(c.high_fill_rate),
             ratio_s,

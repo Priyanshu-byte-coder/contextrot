@@ -75,6 +75,8 @@ Use more than one model? The report also compares them head-to-head — an indep
 
 Work across several repos? `contextrot projects` does the same head-to-head by **project** — an independent rot curve and verdict per working directory, ranked by size, so the specific repo whose CLAUDE.md or MCP setup is dragging you down stops hiding inside your all-projects average.
 
+Use more than one coding agent? `contextrot agents` compares them too — Claude Code vs Codex CLI vs Gemini CLI vs Cline, each with its own curve and verdict on a shared scale, measured on your workload rather than a benchmark's.
+
 ## Commands
 
 ```bash
@@ -87,6 +89,7 @@ contextrot --html report.html   # shareable single-file report (still 100% local
                                 #   use more than one model
 contextrot --json               # every number, recomputable
 contextrot projects             # rank your projects — which repo rots first
+contextrot agents               # rank your coding agents — which CLI rots first
 contextrot fix                  # dry-run: prescriptions + unused MCP servers +
                                 #   CLAUDE.md size. Add --apply to disable unused
                                 #   *global* MCP servers (backs up first, reversible)
@@ -128,6 +131,7 @@ contextrot makes **zero network calls**. Local files in, terminal/local HTML out
 | Cline (VS Code) | ✅ today |
 | Roo Code (VS Code) | ✅ today |
 | Kilo Code (VS Code) | ✅ today |
+| Kiro CLI | ❌ blocked upstream — its transcripts record no token counts, so context fill can't be computed |
 | OpenTelemetry GenAI spans | planned |
 
 An adapter is one small file with a fixture and a test — [it's the paved first-contribution path](CONTRIBUTING.md).
@@ -135,7 +139,7 @@ An adapter is one small file with a fixture and a test — [it's the paved first
 ## Roadmap
 
 - ✅ `contextrot fix` — shipped in 0.6.0: dry-run prescriptions + unused-MCP-server detection, with `--apply` to disable unused global servers (reversible, backed up). Next: before/after measurement and CLAUDE.md-section suggestions.
-- More agent adapters + OTel ingestion
+- OpenTelemetry GenAI span ingestion (the adapter wave shipped in 0.6.1–0.7.0: Codex CLI, Gemini CLI, Qwen Code, Cline, Roo Code, Kilo Code)
 - Opt-in, anonymized aggregate stats → the **State of Context Rot** report: real-workload degradation curves across the community (off by default, aggregate-only, documented schema)
 
 ## Contributing

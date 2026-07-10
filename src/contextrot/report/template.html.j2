@@ -256,6 +256,44 @@
 </div>
 {% endif %}
 
+{% if agents %}
+<div class="card">
+  <h2>By agent</h2>
+  <table>
+    <thead><tr><th>Agent</th><th>Steps</th><th>Fresh rate</th><th>Deep rate</th><th>Ratio</th><th>Threshold</th><th>Verdict</th></tr></thead>
+    <tbody>
+      {% for a in agents %}
+      <tr{% if a.is_other %} class="other"{% endif %}>
+        <td>{{ a.label }}</td><td>{{ a.steps }}</td><td>{{ a.fresh }}</td><td>{{ a.deep }}</td>
+        <td>{{ a.ratio }}</td><td>{{ a.knee }}</td>
+        <td class="v-{{ a.verdict_kind }}">{% if not a.is_other %}{{ a.verdict_icon }} {{ a.verdict_kind }}{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="minis">
+    {% for a in agents %}{% if a.mini %}
+    <div class="mini">
+      <h3>{{ a.label }}</h3>
+      <svg viewBox="0 0 280 125" width="100%" role="img" aria-label="Rot curve for {{ a.label }}">
+        <line x1="10" x2="270" y1="100" y2="100" stroke="var(--baseline)" stroke-width="1"/>
+        {% for b in a.mini.bars %}
+        <rect class="mark" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"
+              fill="{% if b.past_knee %}var(--critical){% else %}var(--series-1){% endif %}"
+              {% if b.low_conf %}opacity="0.55"{% endif %}
+              data-tip="{{ a.label }} — {{ b.tip }}"/>
+        {% endfor %}
+        {% if a.mini.knee_x %}
+        <line x1="{{ a.mini.knee_x }}" x2="{{ a.mini.knee_x }}" y1="10" y2="100" stroke="var(--critical)" stroke-width="1" stroke-dasharray="4 3"/>
+        {% endif %}
+        <text x="140" y="118" text-anchor="middle">context fill 0–100% (shared scale)</text>
+      </svg>
+    </div>
+    {% endif %}{% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <div class="card">
   <h2>Where your context goes (estimated)</h2>
   <svg viewBox="0 0 860 {{ comp.height }}" width="100%" role="img" aria-label="Horizontal bar chart of estimated context composition">

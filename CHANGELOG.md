@@ -4,6 +4,29 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.7.0] - 2026-07-10
+
+### Added
+
+- **Per-agent comparison** — the capstone of the 0.6.x adapter wave. With
+  eight agents supported (Claude Code, Codex CLI, Gemini CLI, Qwen Code,
+  OpenCode, Cline, Roo Code, Kilo Code), contextrot now builds an independent
+  rot curve + verdict *per coding agent* on a shared scale: which CLI
+  degrades first, measured on your workload rather than a benchmark's. New
+  `contextrot agents` subcommand prints the ranked breakdown; the same table
+  and small-multiple charts appear in the default terminal report and the
+  HTML report when at least two agents clear the 150-step floor (smaller
+  agents fold into "Other").
+- Additive `agents` key in `--json` (mirrors `models`/`projects`) and a
+  per-step `source` field.
+- `contextrot sessions` shows an Agent column when sessions span more than
+  one agent.
+
+### Changed
+
+- The no-sessions message and `--data-dir` help now describe the full set of
+  supported agents instead of Claude Code only.
+
 ## [0.6.3] - 2026-07-10
 
 ### Added

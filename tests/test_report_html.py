@@ -3,6 +3,7 @@ from pathlib import Path
 from contextrot.analysis import AnalysisResult
 from contextrot.analysis.by_model import build_model_comparison
 from contextrot.analysis.by_project import build_project_comparison
+from contextrot.analysis.by_source import build_agent_comparison
 from contextrot.analysis.composition import Composition
 from contextrot.analysis.rot import build_reversal_curve, build_rot_curve, verdict
 from contextrot.report.html import _chart_max_rate, render_html
@@ -10,7 +11,11 @@ from contextrot.signals import StepSignals
 
 
 def _step(
-    fill: float, degraded: bool, model: str = "claude-opus-4-8", project: str = ""
+    fill: float,
+    degraded: bool,
+    model: str = "claude-opus-4-8",
+    project: str = "",
+    source: str = "",
 ) -> StepSignals:
     return StepSignals(
         step_index=0,
@@ -18,6 +23,7 @@ def _step(
         fill_pct=fill,
         model=model,
         project=project,
+        source=source,
         tool_error=degraded,
         cost_usd=0.01,
     )
@@ -49,6 +55,7 @@ def _result(steps: list[StepSignals]) -> AnalysisResult:
         verdict_text=text,
         models=build_model_comparison(steps),
         projects=build_project_comparison(steps),
+        agents=build_agent_comparison(steps),
     )
 
 
@@ -138,3 +145,23 @@ def test_project_section_present_with_two_projects(tmp_path: Path):
 def test_project_section_absent_with_one_project(tmp_path: Path):
     html = _render(_result(_mixed_steps()), tmp_path)
     assert "By project" not in html
+
+
+def test_agent_section_present_with_two_agents(tmp_path: Path):
+    steps = [
+        _step(f, i % 10 == 0, source="claude-code")
+        for i, f in enumerate([15.0, 75.0] * 100)
+    ]
+    steps += [
+        _step(f, i % 25 == 0, source="codex")
+        for i, f in enumerate([15.0, 75.0] * 100)
+    ]
+    html = _render(_result(steps), tmp_path)
+    assert "By agent" in html
+    assert "Claude Code" in html and "Codex CLI" in html
+    assert "http://" not in html
+
+
+def test_agent_section_absent_with_one_agent(tmp_path: Path):
+    html = _render(_result(_mixed_steps()), tmp_path)
+    assert "By agent" not in html

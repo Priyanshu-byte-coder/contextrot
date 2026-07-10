@@ -238,6 +238,30 @@ def _context(result: AnalysisResult) -> dict:
                 }
             )
 
+    # Per-agent comparison: same shared-y-scale treatment as models.
+    agents = []
+    real_agents = [a for a in result.agents if not a.is_other]
+    if len(real_agents) >= 2:
+        shared_max = max(_chart_max_rate(a.curve.buckets) for a in real_agents)
+        for a in result.agents:
+            mini = None
+            if not a.is_other:
+                mini = _curve_geometry(a.curve, 10, 270, 10, 100, max_rate=shared_max)
+            agents.append(
+                {
+                    "label": a.label,
+                    "steps": a.steps,
+                    "fresh": _fmt_rate(a.curve.low_fill_rate),
+                    "deep": _fmt_rate(a.curve.high_fill_rate),
+                    "ratio": _fmt_ratio(a.curve.degradation_ratio),
+                    "knee": (f"~{a.curve.knee_pct}%" if a.curve.knee_pct is not None else "none"),
+                    "verdict_kind": a.verdict_kind,
+                    "verdict_icon": icons.get(a.verdict_kind, ""),
+                    "is_other": a.is_other,
+                    "mini": mini,
+                }
+            )
+
     comp = result.composition
     comp_rows_src = [
         ("Startup overhead (avg)", comp.overhead_tokens),
@@ -321,6 +345,7 @@ def _context(result: AnalysisResult) -> dict:
         "chart": chart,
         "models": models,
         "projects": projects,
+        "agents": agents,
         "comp": {
             "rows": comp_rows,
             "height": 10 + len(comp_rows) * 30 + 10,
