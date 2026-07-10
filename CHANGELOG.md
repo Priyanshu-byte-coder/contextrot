@@ -4,6 +4,27 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.6.1] - 2026-07-10
+
+### Added
+
+- **Codex CLI adapter** (closes
+  [#3](https://github.com/Priyanshu-byte-coder/contextrot/issues/3)) — reads
+  Codex's per-session rollout files
+  (`~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`) with real per-call token
+  accounting from `token_count` events, `function_call`/`custom_tool_call`
+  tool calls (including `apply_patch`, whose first touched file becomes the
+  retry/re-read target), and error detection from `Exit code:` prefixes and
+  embedded `metadata.exit_code`. Cached input tokens are split out so context
+  fill is never double counted.
+- Transcripts that state their own context window (Codex's
+  `model_context_window`) now feed it to the analysis as a per-session hint —
+  more accurate fill % than the model-name lookup, still overridable with
+  `--window`.
+- Context-window and list-price entries for GPT-5/GPT-4, Gemini, and Qwen
+  model families (flagged as estimated), so mixed-agent reports price and
+  bucket sensibly.
+
 ## [0.6.0] - 2026-07-09
 
 ### Added

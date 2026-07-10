@@ -32,8 +32,12 @@ _PRICING: list[tuple[str, ModelPricing]] = [
     ("haiku-4", ModelPricing(1.0, 5.0, 1.25, 0.10)),
     ("haiku-3", ModelPricing(0.80, 4.0, 1.0, 0.08)),
     ("fable", ModelPricing(15.0, 75.0, 18.75, 1.50, estimated=True)),
-    ("gpt-5", ModelPricing(1.25, 10.0, 1.25, 0.125, estimated=True)),
-    ("gpt-4", ModelPricing(2.50, 10.0, 2.50, 1.25, estimated=True)),
+    ("gpt-5", ModelPricing(1.25, 10.0, 1.25, 0.125, context_window=272_000, estimated=True)),
+    ("gpt-4", ModelPricing(2.50, 10.0, 2.50, 1.25, context_window=128_000, estimated=True)),
+    ("gemini-2.5-flash", ModelPricing(0.30, 2.50, 0.30, 0.075, 1_048_576, estimated=True)),
+    ("gemini-3", ModelPricing(2.0, 12.0, 2.0, 0.20, 1_048_576, estimated=True)),
+    ("gemini", ModelPricing(1.25, 10.0, 1.625, 0.31, 1_048_576, estimated=True)),
+    ("qwen", ModelPricing(1.0, 5.0, 1.0, 0.10, 262_144, estimated=True)),
 ]
 
 _FALLBACK = ModelPricing(3.0, 15.0, 3.75, 0.30, estimated=True)

@@ -62,6 +62,10 @@ class Session:
     ended_at: datetime | None = None
     sidechain_steps: int = 0  # sub-agent steps excluded from main analysis
     user_message_chars: int = 0
+    # Some transcripts state their own context window (e.g. Codex's
+    # model_context_window). When present it beats the model-name lookup,
+    # but never a user-supplied --window override.
+    context_window_hint: int | None = None
 
     @property
     def peak_prompt_tokens(self) -> int:

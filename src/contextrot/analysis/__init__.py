@@ -99,7 +99,7 @@ def analyze(
     window = window_override or DEFAULT_CONTEXT_WINDOW
     for s in sessions:
         model = s.steps[0].model if s.steps else ""
-        session_window = context_window_for(model, window_override)
+        session_window = context_window_for(model, window_override or s.context_window_hint)
         window = max(window, session_window)
         all_steps.extend(extract_signals(s, session_window).steps)
 
