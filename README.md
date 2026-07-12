@@ -171,8 +171,11 @@ An adapter is one small file with a fixture and a test — [it's the paved first
 
 ## Roadmap
 
-- ✅ `contextrot fix` — shipped in 0.6.0: dry-run prescriptions + unused-MCP-server detection, with `--apply` to disable unused global servers (reversible, backed up). Next: before/after measurement and CLAUDE.md-section suggestions.
-- OpenTelemetry GenAI span ingestion (the adapter wave shipped in 0.6.1–0.7.0: Codex CLI, Gemini CLI, Qwen Code, Cline, Roo Code, Kilo Code)
+- ✅ `contextrot fix` (0.6.0) — dry-run prescriptions + unused-MCP-server detection, reversible `--apply`
+- ✅ Adapter wave (0.6.1–0.7.0) — Codex CLI, Gemini CLI, Qwen Code, Cline, Roo Code, Kilo Code + per-agent comparison
+- ✅ Live surfaces (0.8.0–0.10.0) — calibrated Claude Code statusline, knee-crossing warning hook, MCP server for any agent
+- ✅ `contextrot trends` (0.11.0) — week-over-week before/after measurement for `fix`
+- OpenTelemetry GenAI span ingestion
 - Opt-in, anonymized aggregate stats → the **State of Context Rot** report: real-workload degradation curves across the community (off by default, aggregate-only, documented schema)
 
 ## Contributing
