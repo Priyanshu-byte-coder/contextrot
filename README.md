@@ -95,6 +95,9 @@ contextrot install statusline   # live context-health segment in Claude Code's
                                 #   (dry-run by default; --apply to write)
 contextrot install hook         # one-time in-session warning when you cross
                                 #   your measured degradation threshold
+contextrot mcp                  # MCP stdio server — let any MCP-capable agent
+                                #   query your rot report mid-session
+                                #   (claude mcp add contextrot -- contextrot mcp)
 contextrot fix                  # dry-run: prescriptions + unused MCP servers +
                                 #   CLAUDE.md size. Add --apply to disable unused
                                 #   *global* MCP servers (backs up first, reversible)

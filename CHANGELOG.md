@@ -4,6 +4,22 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.10.0] - 2026-07-12
+
+### Added
+
+- **MCP server** — `contextrot mcp` serves contextrot to *any* MCP-capable
+  agent over stdio (`claude mcp add contextrot -- contextrot mcp`). Three
+  tools: `rot_report` (verdict, knee, fresh/deep failure rates, cost of
+  degraded steps, prescriptions), `agents_ranking` (which of the user's CLIs
+  degrades first), and `prescriptions`. The agent itself can now ask "how
+  rotted is my human's setup?" mid-session and act on the answer — compact,
+  warn, or switch models.
+- Zero new dependencies: the JSON-RPC 2.0 / MCP stdio transport
+  (newline-delimited, spec 2025-06-18, with version negotiation, ping, and
+  in-band tool errors) is implemented in the standard library. Still zero
+  network calls — stdio is a pipe to the parent process, not a socket.
+
 ## [0.9.0] - 2026-07-12
 
 ### Added

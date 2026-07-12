@@ -525,6 +525,20 @@ def hook() -> None:
         print(json.dumps({"systemMessage": msg}))
 
 
+@app.command()
+def mcp() -> None:
+    """Serve contextrot as an MCP stdio server for any MCP-capable agent.
+
+    Tools: rot_report, agents_ranking, prescriptions. Register with e.g.
+    `claude mcp add contextrot -- contextrot mcp`. Local files only —
+    stdio is a pipe to the parent process, and contextrot makes zero
+    network calls.
+    """
+    from contextrot.mcp import serve
+
+    serve()
+
+
 InstallSettings = Annotated[
     Optional[Path],
     typer.Option(
