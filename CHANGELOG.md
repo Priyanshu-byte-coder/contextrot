@@ -4,6 +4,26 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.9.0] - 2026-07-12
+
+### Added
+
+- **Knee-crossing warning hook for Claude Code** — `contextrot install hook`
+  registers a PostToolUse hook that watches the live session and warns **once**
+  the moment context fill crosses your measured degradation threshold:
+  *"contextrot: context 75% — past your measured degradation threshold (~70%).
+  Your failure rate here is 2.0× fresh-context. Consider /compact or a fresh
+  session."* The fill comes from a tail read of the live transcript (cheap even
+  on multi-megabyte sessions); the threshold and rates come from your
+  calibration cache. A marker keeps it from nagging on every tool call, and it
+  re-arms after fill drops back below the knee (e.g. post-/compact).
+- Honest by design: with no calibration, too little data, or no knee in your
+  curve, the hook says nothing — no generic scare thresholds.
+- Installer safety as always: dry-run by default, `--apply` + confirm,
+  `.contextrot.bak` backup. The hook entry is appended without touching your
+  existing hooks, and `contextrot uninstall hook` removes only contextrot's
+  entry.
+
 ## [0.8.0] - 2026-07-12
 
 ### Added

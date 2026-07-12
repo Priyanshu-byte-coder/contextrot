@@ -18,17 +18,17 @@ def claude_settings_path() -> Path:
     return Path.home() / ".claude" / "settings.json"
 
 
-def statusline_command() -> str:
-    """The shell command Claude Code should run for the statusline.
+def surface_command(surface: str) -> str:
+    """The shell command Claude Code should run for a live surface.
 
     Prefers the console script when it's on PATH; otherwise falls back to
     the current interpreter so uvx/venv installs still work.
     """
     if shutil.which("contextrot"):
-        return "contextrot statusline"
+        return f"contextrot {surface}"
     py = sys.executable or "python"
     quoted = f'"{py}"' if " " in py else py
-    return f"{quoted} -m contextrot statusline"
+    return f"{quoted} -m contextrot {surface}"
 
 
 def read_settings(path: Path) -> dict:
@@ -65,4 +65,45 @@ def is_contextrot_entry(value: object) -> bool:
 
 
 def statusline_entry() -> dict:
-    return {"type": "command", "command": statusline_command()}
+    return {"type": "command", "command": surface_command("statusline")}
+
+
+def hook_entry() -> dict:
+    """The PostToolUse matcher entry for the knee-crossing warning."""
+    return {
+        "matcher": "",
+        "hooks": [{"type": "command", "command": surface_command("hook"), "timeout": 10}],
+    }
+
+
+def _post_tool_use(settings: dict) -> list:
+    hooks_cfg = settings.get("hooks")
+    if not isinstance(hooks_cfg, dict):
+        return []
+    entries = hooks_cfg.get("PostToolUse")
+    return entries if isinstance(entries, list) else []
+
+
+def has_hook(settings: dict) -> bool:
+    return any(is_contextrot_entry(e) for e in _post_tool_use(settings))
+
+
+def add_hook(settings: dict) -> None:
+    """Append our PostToolUse entry, preserving everything already there."""
+    hooks_cfg = settings.setdefault("hooks", {})
+    entries = hooks_cfg.setdefault("PostToolUse", [])
+    entries.append(hook_entry())
+
+
+def remove_hook(settings: dict) -> bool:
+    """Remove our PostToolUse entries only. Returns True when something was removed."""
+    entries = _post_tool_use(settings)
+    kept = [e for e in entries if not is_contextrot_entry(e)]
+    if len(kept) == len(entries):
+        return False
+    settings["hooks"]["PostToolUse"] = kept
+    if not kept:
+        del settings["hooks"]["PostToolUse"]
+    if not settings["hooks"]:
+        del settings["hooks"]
+    return True

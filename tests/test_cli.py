@@ -211,3 +211,118 @@ def test_report_with_data_dir_does_not_write_calibration(tmp_path: Path):
     )
     assert result.exit_code == 0
     assert not cal.exists()
+
+
+def test_hook_command_emits_system_message(tmp_path: Path):
+    import json as _json
+
+    cal = tmp_path / "calibration.json"
+    cal.write_text(
+        _json.dumps(
+            {
+                "schema": 1,
+                "computed_at": "2026-07-12T00:00:00+00:00",
+                "days": 30,
+                "steps": 5000,
+                "verdict_kind": "edge",
+                "knee_pct": 70.0,
+                "low_fill_rate": 0.033,
+                "high_fill_rate": 0.048,
+                "buckets": [{"lo": 70, "hi": 100, "n": 400, "rate": 0.066}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    transcript = tmp_path / "t.jsonl"
+    transcript.write_text(
+        _json.dumps(
+            {
+                "type": "assistant",
+                "message": {
+                    "model": "claude-opus-4-8",
+                    "usage": {"input_tokens": 150000, "output_tokens": 10},
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    payload = _json.dumps({"session_id": "cli-hook", "transcript_path": str(transcript)})
+    result = runner.invoke(
+        app,
+        ["hook"],
+        input=payload,
+        env={
+            "CONTEXTROT_CALIBRATION": str(cal),
+            "CONTEXTROT_HOOK_STATE": str(tmp_path / "state"),
+        },
+    )
+    assert result.exit_code == 0
+    out = _json.loads(result.output)
+    assert "past your measured degradation threshold" in out["systemMessage"]
+
+
+def test_hook_command_silent_without_calibration(tmp_path: Path):
+    result = runner.invoke(
+        app,
+        ["hook"],
+        input="{}",
+        env={
+            "CONTEXTROT_CALIBRATION": str(tmp_path / "none.json"),
+            "CONTEXTROT_HOOK_STATE": str(tmp_path / "state"),
+        },
+    )
+    assert result.exit_code == 0
+    assert result.output.strip() == ""
+
+
+def test_install_hook_apply_preserves_existing_hooks(tmp_path: Path):
+    settings = tmp_path / "settings.json"
+    existing = {
+        "hooks": {
+            "PostToolUse": [
+                {"matcher": "Edit", "hooks": [{"type": "command", "command": "lint.sh"}]}
+            ]
+        }
+    }
+    settings.write_text(json.dumps(existing), encoding="utf-8")
+    result = runner.invoke(
+        app, ["install", "hook", "--settings", str(settings), "--apply"], input="y\n"
+    )
+    assert result.exit_code == 0
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    entries = data["hooks"]["PostToolUse"]
+    assert len(entries) == 2
+    assert entries[0]["hooks"][0]["command"] == "lint.sh"
+    assert "contextrot" in json.dumps(entries[1])
+    # Idempotent: second install is a no-op.
+    result = runner.invoke(
+        app, ["install", "hook", "--settings", str(settings), "--apply"], input="y\n"
+    )
+    assert "Already installed" in result.output
+    assert len(json.loads(settings.read_text(encoding="utf-8"))["hooks"]["PostToolUse"]) == 2
+
+
+def test_uninstall_hook_removes_only_ours(tmp_path: Path):
+    settings = tmp_path / "settings.json"
+    settings.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "PostToolUse": [
+                        {"matcher": "Edit", "hooks": [{"type": "command", "command": "lint.sh"}]}
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    runner.invoke(app, ["install", "hook", "--settings", str(settings), "--apply"], input="y\n")
+    result = runner.invoke(
+        app, ["uninstall", "hook", "--settings", str(settings), "--apply"], input="y\n"
+    )
+    assert result.exit_code == 0
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    entries = data["hooks"]["PostToolUse"]
+    assert len(entries) == 1
+    assert entries[0]["hooks"][0]["command"] == "lint.sh"

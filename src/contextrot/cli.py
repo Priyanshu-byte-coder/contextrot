@@ -501,6 +501,30 @@ def statusline() -> None:
     print(render_statusline(payload, load_calibration()))
 
 
+@app.command()
+def hook() -> None:
+    """Claude Code PostToolUse hook: warn once when a session crosses your knee.
+
+    Wire it up with `contextrot install hook`. Reads hook JSON from stdin,
+    checks the live transcript's context fill against your measured
+    degradation threshold, and emits a systemMessage the first time a
+    session crosses it. Silent when uncalibrated or your curve has no knee.
+    """
+    from contextrot.calibration import load_calibration
+    from contextrot.hook import evaluate
+
+    try:
+        raw = sys.stdin.read()
+        payload = json.loads(raw) if raw.strip() else {}
+        if not isinstance(payload, dict):
+            payload = {}
+        msg = evaluate(payload, load_calibration())
+    except Exception:  # noqa: BLE001 — a crashing hook disrupts the session
+        msg = None
+    if msg:
+        print(json.dumps({"systemMessage": msg}))
+
+
 InstallSettings = Annotated[
     Optional[Path],
     typer.Option(
@@ -534,15 +558,20 @@ def install(
 ) -> None:
     """Install a contextrot live surface into Claude Code. Dry-run by default."""
     from contextrot.install import (
+        add_hook,
         claude_settings_path,
+        has_hook,
+        hook_entry,
         is_contextrot_entry,
         read_settings,
         statusline_entry,
         write_settings_with_backup,
     )
 
-    if target != "statusline":
-        console.print(f"[red]Unknown install target:[/red] {target} (expected 'statusline')")
+    if target not in ("statusline", "hook"):
+        console.print(
+            f"[red]Unknown install target:[/red] {target} (expected 'statusline' or 'hook')"
+        )
         raise typer.Exit(code=2)
 
     path = settings or claude_settings_path()
@@ -552,22 +581,29 @@ def install(
         console.print(f"[red]Couldn't read {path}:[/red] {e}")
         raise typer.Exit(code=1) from e
 
-    entry = statusline_entry()
-    existing = current.get("statusLine")
-    if existing == entry:
-        console.print(f"[green]Already installed[/green] in {path} — nothing to do.")
-        raise typer.Exit(code=0)
-    if existing is not None and not is_contextrot_entry(existing) and not force:
-        console.print(
-            f"[yellow]A statusLine is already configured[/yellow] in {path}:\n"
-            f"  {json.dumps(existing)}\n"
-            "It isn't contextrot's, so it won't be replaced without [bold]--force[/bold] "
-            "(the previous file is backed up either way)."
-        )
-        raise typer.Exit(code=1)
+    if target == "statusline":
+        entry = statusline_entry()
+        existing = current.get("statusLine")
+        if existing == entry:
+            console.print(f"[green]Already installed[/green] in {path} — nothing to do.")
+            raise typer.Exit(code=0)
+        if existing is not None and not is_contextrot_entry(existing) and not force:
+            console.print(
+                f"[yellow]A statusLine is already configured[/yellow] in {path}:\n"
+                f"  {json.dumps(existing)}\n"
+                "It isn't contextrot's, so it won't be replaced without [bold]--force[/bold] "
+                "(the previous file is backed up either way)."
+            )
+            raise typer.Exit(code=1)
+        preview = {"statusLine": entry}
+    else:
+        if has_hook(current):
+            console.print(f"[green]Already installed[/green] in {path} — nothing to do.")
+            raise typer.Exit(code=0)
+        preview = {"hooks": {"PostToolUse": ["…existing entries…", hook_entry()]}}
 
     console.print(f"[bold]Would set in {path}:[/bold]")
-    console.print(json.dumps({"statusLine": entry}, indent=2))
+    console.print(json.dumps(preview, indent=2))
     if not apply:
         console.print(
             "  [dim]Dry run.[/dim] Re-run with [bold]--apply[/bold] to write "
@@ -575,16 +611,24 @@ def install(
         )
         raise typer.Exit(code=0)
 
-    if not typer.confirm(f"Write statusLine to {path}?", default=False):
+    if not typer.confirm(f"Write {target} config to {path}?", default=False):
         console.print("Nothing written.")
         raise typer.Exit(code=0)
 
-    current["statusLine"] = entry
+    if target == "statusline":
+        current["statusLine"] = statusline_entry()
+        done = "[green]Statusline installed.[/green] It appears on your next interaction."
+    else:
+        add_hook(current)
+        done = (
+            "[green]Hook installed.[/green] You'll get a one-time warning whenever a "
+            "session crosses your measured degradation threshold."
+        )
     backup = write_settings_with_backup(path, current)
-    console.print("[green]Statusline installed.[/green] It appears on your next interaction.")
+    console.print(done)
     if backup is not None:
         console.print(f"  Backup written: {backup}")
-    console.print("  Undo: `contextrot uninstall statusline --apply`, or restore the backup.")
+    console.print(f"  Undo: `contextrot uninstall {target} --apply`, or restore the backup.")
 
 
 @app.command()
@@ -605,13 +649,17 @@ def uninstall(
     """Remove a contextrot live surface from Claude Code. Dry-run by default."""
     from contextrot.install import (
         claude_settings_path,
+        has_hook,
         is_contextrot_entry,
         read_settings,
+        remove_hook,
         write_settings_with_backup,
     )
 
-    if target != "statusline":
-        console.print(f"[red]Unknown uninstall target:[/red] {target} (expected 'statusline')")
+    if target not in ("statusline", "hook"):
+        console.print(
+            f"[red]Unknown uninstall target:[/red] {target} (expected 'statusline' or 'hook')"
+        )
         raise typer.Exit(code=2)
 
     path = settings or claude_settings_path()
@@ -621,18 +669,26 @@ def uninstall(
         console.print(f"[red]Couldn't read {path}:[/red] {e}")
         raise typer.Exit(code=1) from e
 
-    existing = current.get("statusLine")
-    if existing is None:
-        console.print("[green]No statusLine configured[/green] — nothing to remove.")
-        raise typer.Exit(code=0)
-    if not is_contextrot_entry(existing):
-        console.print(
-            "[yellow]The configured statusLine isn't contextrot's[/yellow] — not touching it:\n"
-            f"  {json.dumps(existing)}"
-        )
-        raise typer.Exit(code=1)
+    if target == "statusline":
+        existing = current.get("statusLine")
+        if existing is None:
+            console.print("[green]No statusLine configured[/green] — nothing to remove.")
+            raise typer.Exit(code=0)
+        if not is_contextrot_entry(existing):
+            console.print(
+                "[yellow]The configured statusLine isn't contextrot's[/yellow] — "
+                "not touching it:\n"
+                f"  {json.dumps(existing)}"
+            )
+            raise typer.Exit(code=1)
+        what = "'statusLine'"
+    else:
+        if not has_hook(current):
+            console.print("[green]No contextrot hook configured[/green] — nothing to remove.")
+            raise typer.Exit(code=0)
+        what = "the contextrot PostToolUse hook"
 
-    console.print(f"[bold]Would remove 'statusLine' from {path}.[/bold]")
+    console.print(f"[bold]Would remove {what} from {path}.[/bold]")
     if not apply:
         console.print(
             "  [dim]Dry run.[/dim] Re-run with [bold]--apply[/bold] to write. "
@@ -640,13 +696,18 @@ def uninstall(
         )
         raise typer.Exit(code=0)
 
-    if not typer.confirm(f"Remove statusLine from {path}?", default=False):
+    if not typer.confirm(f"Remove {what} from {path}?", default=False):
         console.print("Nothing written.")
         raise typer.Exit(code=0)
 
-    del current["statusLine"]
+    if target == "statusline":
+        del current["statusLine"]
+        done = "[green]Statusline removed.[/green]"
+    else:
+        remove_hook(current)
+        done = "[green]Hook removed.[/green]"
     backup = write_settings_with_backup(path, current)
-    console.print("[green]Statusline removed.[/green]")
+    console.print(done)
     if backup is not None:
         console.print(f"  Backup written: {backup}")
 

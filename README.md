@@ -93,6 +93,8 @@ contextrot agents               # rank your coding agents — which CLI rots fir
 contextrot install statusline   # live context-health segment in Claude Code's
                                 #   statusline, colored by YOUR measured curve
                                 #   (dry-run by default; --apply to write)
+contextrot install hook         # one-time in-session warning when you cross
+                                #   your measured degradation threshold
 contextrot fix                  # dry-run: prescriptions + unused MCP servers +
                                 #   CLAUDE.md size. Add --apply to disable unused
                                 #   *global* MCP servers (backs up first, reversible)
@@ -114,6 +116,11 @@ Every plain `contextrot` run recalibrates it from your latest data. Other
 statusline tools show cost and a hardcoded threshold; this one knows where
 *you* start failing. Dry-run by default, backed up, reversible with
 `contextrot uninstall statusline`.
+
+Prefer an active nudge over a passive bar? `contextrot install hook` registers
+a PostToolUse hook that warns **once** — the moment a session crosses your
+measured threshold — then stays quiet until the next crossing. If your curve
+has no knee, it says nothing at all: no generic scare thresholds.
 
 ## How is this different from…
 
