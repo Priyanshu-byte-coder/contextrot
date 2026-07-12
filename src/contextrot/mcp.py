@@ -103,6 +103,10 @@ def _finite(value: float | None) -> float | None:
     return round(value, 3)
 
 
+def _rate(value: float | None) -> float | None:
+    return None if value is None else round(value, 4)
+
+
 def _tool_rot_report(args: dict) -> dict:
     r = _analysis(args)
     return {
@@ -110,8 +114,8 @@ def _tool_rot_report(args: dict) -> dict:
         "sessions": len(r.sessions),
         "steps": len(r.steps),
         "knee_pct": r.curve.knee_pct,
-        "fresh_failure_rate": round(r.curve.low_fill_rate, 4),
-        "deep_failure_rate": round(r.curve.high_fill_rate, 4),
+        "fresh_failure_rate": _rate(r.curve.low_fill_rate),
+        "deep_failure_rate": _rate(r.curve.high_fill_rate),
         "degradation_ratio": _finite(r.curve.degradation_ratio),
         "ratio_significant": r.curve.ratio_significant,
         "cost_of_degraded_steps_usd": round(r.rework_cost_usd, 2),
@@ -129,8 +133,8 @@ def _tool_agents_ranking(args: dict) -> dict:
             {
                 "agent": a.label,
                 "steps": a.steps,
-                "fresh_failure_rate": round(a.curve.low_fill_rate, 4),
-                "deep_failure_rate": round(a.curve.high_fill_rate, 4),
+                "fresh_failure_rate": _rate(a.curve.low_fill_rate),
+                "deep_failure_rate": _rate(a.curve.high_fill_rate),
                 "degradation_ratio": _finite(a.curve.degradation_ratio),
                 "knee_pct": a.curve.knee_pct,
                 "verdict": a.verdict_kind,

@@ -4,6 +4,15 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.12.1] - 2026-07-12
+
+### Fixed
+
+- Type error in the MCP server's rate rounding (`round()` on a nullable
+  rate) that failed CI's type check on all platforms. No behavior change
+  for tool callers: rates were already correct when present; `null` now
+  passes through explicitly when a curve half is empty.
+
 ## [0.12.0] - 2026-07-12
 
 ### Added
