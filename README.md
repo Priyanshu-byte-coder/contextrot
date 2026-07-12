@@ -90,11 +90,30 @@ contextrot --html report.html   # shareable single-file report (still 100% local
 contextrot --json               # every number, recomputable
 contextrot projects             # rank your projects — which repo rots first
 contextrot agents               # rank your coding agents — which CLI rots first
+contextrot install statusline   # live context-health segment in Claude Code's
+                                #   statusline, colored by YOUR measured curve
+                                #   (dry-run by default; --apply to write)
 contextrot fix                  # dry-run: prescriptions + unused MCP servers +
                                 #   CLAUDE.md size. Add --apply to disable unused
                                 #   *global* MCP servers (backs up first, reversible)
 contextrot sessions             # list what was parsed
 ```
+
+## Live statusline (Claude Code)
+
+The report tells you where you degrade; the statusline tells you **while it's
+happening**. After `contextrot install statusline --apply`, Claude Code's
+status bar shows your current context fill colored against your *own* measured
+curve — not a generic "yellow at 70%":
+
+```
+ctx 72% ███████░░░ · ▲ past your knee (~70%) · fail here 4.8% (1.5× fresh)
+```
+
+Every plain `contextrot` run recalibrates it from your latest data. Other
+statusline tools show cost and a hardcoded threshold; this one knows where
+*you* start failing. Dry-run by default, backed up, reversible with
+`contextrot uninstall statusline`.
 
 ## How is this different from…
 

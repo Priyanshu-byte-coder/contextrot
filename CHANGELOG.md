@@ -4,6 +4,29 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.8.0] - 2026-07-12
+
+### Added
+
+- **Live statusline for Claude Code** — the report's knowledge, in the session
+  where it matters. `contextrot statusline` renders a context-health segment
+  from the JSON Claude Code pipes to statusline commands: current fill with a
+  bar, colored against **your measured degradation curve** (green below your
+  knee, yellow approaching it, red past it) instead of a generic hardcoded
+  threshold, plus your historical failure rate at the current fill
+  ("fail here 4.8% (1.5× fresh)"). Uncalibrated setups fall back to generic
+  70/90 thresholds and say so.
+- `contextrot install statusline` / `contextrot uninstall statusline` — wires
+  the statusline into `~/.claude/settings.json` with the same safety contract
+  as `contextrot fix`: **dry-run by default**, `--apply` + confirmation to
+  write, a `.contextrot.bak` backup beside the file, and an existing
+  non-contextrot statusLine is never replaced without `--force`.
+- **Calibration cache** (`~/.contextrot/calibration.json`) — every full report
+  run over your real data dirs snapshots your curve (knee, verdict, per-bucket
+  rates) so live surfaces can compare in milliseconds. It's a cache, not
+  state: delete it freely, the next report rewrites it. Runs with `--data-dir`
+  never write it, so fixtures can't poison your calibration.
+
 ## [0.7.0] - 2026-07-10
 
 ### Added

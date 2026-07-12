@@ -122,3 +122,92 @@ def test_fix_apply_disables_with_backup(tmp_path: Path):
     assert "unused_server" not in data["mcpServers"]
     assert "unused_server" in data["contextrotDisabledMcpServers"]
     assert (tmp_path / "claude.json.contextrot.bak").exists()
+
+
+def test_statusline_command(tmp_path: Path):
+    payload = json.dumps({"context_window": {"used_percentage": 42}})
+    result = runner.invoke(
+        app,
+        ["statusline"],
+        input=payload,
+        env={"CONTEXTROT_CALIBRATION": str(tmp_path / "none.json")},
+    )
+    assert result.exit_code == 0
+    assert "42%" in result.output
+
+
+def test_statusline_survives_garbage_stdin(tmp_path: Path):
+    result = runner.invoke(
+        app,
+        ["statusline"],
+        input="{not json",
+        env={"CONTEXTROT_CALIBRATION": str(tmp_path / "none.json")},
+    )
+    assert result.exit_code == 0
+    assert "ctx" in result.output
+
+
+def test_install_statusline_dry_run_writes_nothing(tmp_path: Path):
+    settings = tmp_path / "settings.json"
+    result = runner.invoke(app, ["install", "statusline", "--settings", str(settings)])
+    assert result.exit_code == 0
+    assert "Dry run" in result.output
+    assert not settings.exists()
+
+
+def test_install_statusline_apply(tmp_path: Path):
+    settings = tmp_path / "settings.json"
+    settings.write_text(json.dumps({"model": "opus"}), encoding="utf-8")
+    result = runner.invoke(
+        app, ["install", "statusline", "--settings", str(settings), "--apply"], input="y\n"
+    )
+    assert result.exit_code == 0
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    assert data["model"] == "opus"  # untouched
+    assert data["statusLine"]["type"] == "command"
+    assert "contextrot" in data["statusLine"]["command"]
+    backup = Path(str(settings) + ".contextrot.bak")
+    assert backup.exists()
+    assert json.loads(backup.read_text(encoding="utf-8")) == {"model": "opus"}
+
+
+def test_install_statusline_refuses_foreign_entry(tmp_path: Path):
+    settings = tmp_path / "settings.json"
+    settings.write_text(
+        json.dumps({"statusLine": {"type": "command", "command": "my-own-script.sh"}}),
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app, ["install", "statusline", "--settings", str(settings), "--apply"], input="y\n"
+    )
+    assert result.exit_code == 1
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    assert data["statusLine"]["command"] == "my-own-script.sh"
+
+
+def test_uninstall_statusline_roundtrip(tmp_path: Path):
+    settings = tmp_path / "settings.json"
+    runner.invoke(
+        app, ["install", "statusline", "--settings", str(settings), "--apply"], input="y\n"
+    )
+    # Dry run first: key stays.
+    result = runner.invoke(app, ["uninstall", "statusline", "--settings", str(settings)])
+    assert result.exit_code == 0
+    assert "statusLine" in json.loads(settings.read_text(encoding="utf-8"))
+    # Apply: key removed.
+    result = runner.invoke(
+        app, ["uninstall", "statusline", "--settings", str(settings), "--apply"], input="y\n"
+    )
+    assert result.exit_code == 0
+    assert "statusLine" not in json.loads(settings.read_text(encoding="utf-8"))
+
+
+def test_report_with_data_dir_does_not_write_calibration(tmp_path: Path):
+    cal = tmp_path / "calibration.json"
+    result = runner.invoke(
+        app,
+        ["--data-dir", str(FIXTURES), "--days", "0"],
+        env={"CONTEXTROT_CALIBRATION": str(cal), "NO_COLOR": "1"},
+    )
+    assert result.exit_code == 0
+    assert not cal.exists()

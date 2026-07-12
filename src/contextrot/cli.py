@@ -113,6 +113,14 @@ def main(
         )
         raise typer.Exit(code=1)
 
+    # Refresh the calibration cache for live surfaces (statusline, hooks) —
+    # only from a real run over the default data dirs, so pointing --data-dir
+    # at a fixture or another machine's export can't poison your calibration.
+    if data_dir is None:
+        from contextrot.calibration import save_calibration
+
+        save_calibration(result)
+
     if as_json:
         payload = {
             "version": __version__,
@@ -467,6 +475,180 @@ def fix(
         "  Undo: restore the backup, or move the entries back from "
         "'contextrotDisabledMcpServers' to 'mcpServers'."
     )
+
+
+@app.command()
+def statusline() -> None:
+    """Render a Claude Code statusline segment (reads session JSON from stdin).
+
+    Wire it up with `contextrot install statusline` — Claude Code pipes live
+    session JSON to this command and displays what it prints: current context
+    fill, colored against YOUR measured degradation curve, not a generic
+    threshold. Run a plain `contextrot` report now and then to recalibrate.
+    """
+    from contextrot.calibration import load_calibration
+    from contextrot.statusline import render_statusline
+
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw) if raw.strip() else {}
+    except ValueError:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    # Plain print, not rich: Claude Code displays the raw bytes, and rich
+    # soft-wrapping or highlighting would mangle the ANSI segment.
+    print(render_statusline(payload, load_calibration()))
+
+
+InstallSettings = Annotated[
+    Optional[Path],
+    typer.Option(
+        "--settings",
+        help="Path to Claude Code settings.json (default: ~/.claude/settings.json).",
+    ),
+]
+
+
+@app.command()
+def install(
+    target: Annotated[
+        str, typer.Argument(help="What to install: 'statusline'.")
+    ],
+    apply: Annotated[
+        bool,
+        typer.Option(
+            "--apply",
+            help="Actually write settings.json (backs it up first). "
+            "Without this, install is a dry run and writes nothing.",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Replace an existing non-contextrot statusLine (still backed up).",
+        ),
+    ] = False,
+    settings: InstallSettings = None,
+) -> None:
+    """Install a contextrot live surface into Claude Code. Dry-run by default."""
+    from contextrot.install import (
+        claude_settings_path,
+        is_contextrot_entry,
+        read_settings,
+        statusline_entry,
+        write_settings_with_backup,
+    )
+
+    if target != "statusline":
+        console.print(f"[red]Unknown install target:[/red] {target} (expected 'statusline')")
+        raise typer.Exit(code=2)
+
+    path = settings or claude_settings_path()
+    try:
+        current = read_settings(path)
+    except (ValueError, OSError) as e:
+        console.print(f"[red]Couldn't read {path}:[/red] {e}")
+        raise typer.Exit(code=1) from e
+
+    entry = statusline_entry()
+    existing = current.get("statusLine")
+    if existing == entry:
+        console.print(f"[green]Already installed[/green] in {path} — nothing to do.")
+        raise typer.Exit(code=0)
+    if existing is not None and not is_contextrot_entry(existing) and not force:
+        console.print(
+            f"[yellow]A statusLine is already configured[/yellow] in {path}:\n"
+            f"  {json.dumps(existing)}\n"
+            "It isn't contextrot's, so it won't be replaced without [bold]--force[/bold] "
+            "(the previous file is backed up either way)."
+        )
+        raise typer.Exit(code=1)
+
+    console.print(f"[bold]Would set in {path}:[/bold]")
+    console.print(json.dumps({"statusLine": entry}, indent=2))
+    if not apply:
+        console.print(
+            "  [dim]Dry run.[/dim] Re-run with [bold]--apply[/bold] to write "
+            "(the previous settings.json is backed up first). Nothing was written."
+        )
+        raise typer.Exit(code=0)
+
+    if not typer.confirm(f"Write statusLine to {path}?", default=False):
+        console.print("Nothing written.")
+        raise typer.Exit(code=0)
+
+    current["statusLine"] = entry
+    backup = write_settings_with_backup(path, current)
+    console.print("[green]Statusline installed.[/green] It appears on your next interaction.")
+    if backup is not None:
+        console.print(f"  Backup written: {backup}")
+    console.print("  Undo: `contextrot uninstall statusline --apply`, or restore the backup.")
+
+
+@app.command()
+def uninstall(
+    target: Annotated[
+        str, typer.Argument(help="What to uninstall: 'statusline'.")
+    ],
+    apply: Annotated[
+        bool,
+        typer.Option(
+            "--apply",
+            help="Actually write settings.json (backs it up first). "
+            "Without this, uninstall is a dry run and writes nothing.",
+        ),
+    ] = False,
+    settings: InstallSettings = None,
+) -> None:
+    """Remove a contextrot live surface from Claude Code. Dry-run by default."""
+    from contextrot.install import (
+        claude_settings_path,
+        is_contextrot_entry,
+        read_settings,
+        write_settings_with_backup,
+    )
+
+    if target != "statusline":
+        console.print(f"[red]Unknown uninstall target:[/red] {target} (expected 'statusline')")
+        raise typer.Exit(code=2)
+
+    path = settings or claude_settings_path()
+    try:
+        current = read_settings(path)
+    except (ValueError, OSError) as e:
+        console.print(f"[red]Couldn't read {path}:[/red] {e}")
+        raise typer.Exit(code=1) from e
+
+    existing = current.get("statusLine")
+    if existing is None:
+        console.print("[green]No statusLine configured[/green] — nothing to remove.")
+        raise typer.Exit(code=0)
+    if not is_contextrot_entry(existing):
+        console.print(
+            "[yellow]The configured statusLine isn't contextrot's[/yellow] — not touching it:\n"
+            f"  {json.dumps(existing)}"
+        )
+        raise typer.Exit(code=1)
+
+    console.print(f"[bold]Would remove 'statusLine' from {path}.[/bold]")
+    if not apply:
+        console.print(
+            "  [dim]Dry run.[/dim] Re-run with [bold]--apply[/bold] to write. "
+            "Nothing was written."
+        )
+        raise typer.Exit(code=0)
+
+    if not typer.confirm(f"Remove statusLine from {path}?", default=False):
+        console.print("Nothing written.")
+        raise typer.Exit(code=0)
+
+    del current["statusLine"]
+    backup = write_settings_with_backup(path, current)
+    console.print("[green]Statusline removed.[/green]")
+    if backup is not None:
+        console.print(f"  Backup written: {backup}")
 
 
 if __name__ == "__main__":
