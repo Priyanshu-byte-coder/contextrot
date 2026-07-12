@@ -4,6 +4,29 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [1.0.0] - 2026-07-12
+
+The 1.0 milestone. Everything below is now considered stable surface:
+
+- **Eight agents**: Claude Code, Codex CLI, Gemini CLI, Qwen Code, OpenCode,
+  Cline, Roo Code, Kilo Code — one normalized analysis across all of them.
+- **Four questions answered**: where do I degrade (report, curve, knee),
+  what's causing it (five behavioral signals + reversal axis), what do I
+  change (`fix`, prescriptions), and did it work (`trends`).
+- **Three comparison axes**: by model, by project, by agent.
+- **Live surfaces**: calibrated Claude Code statusline, knee-crossing warning
+  hook, MCP server for any MCP-capable agent, local SVG verdict badge.
+- **The contract**: zero network calls, statistics that can honestly say
+  "you're fine" (Wilson CIs everywhere, thresholds only declared past
+  noise), config writes that are dry-run by default, backed up, and
+  reversible.
+
+### Changed
+
+- Development Status classifier: Beta → Production/Stable.
+- CLI command surface and `--json` schema are now stable; additions stay
+  additive within 1.x.
+
 ## [0.12.1] - 2026-07-12
 
 ### Fixed
