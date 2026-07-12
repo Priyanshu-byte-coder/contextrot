@@ -4,6 +4,21 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.11.0] - 2026-07-12
+
+### Added
+
+- **`contextrot trends`** — week-over-week failure rate (with Wilson CIs),
+  average context fill, and session startup overhead, plus an
+  improving/worsening/flat verdict that only fires when the pooled intervals
+  of the earlier and later halves don't overlap. One good week proves
+  nothing, and the trend says so.
+- This closes the loop `contextrot fix` opened: change your setup, keep
+  working, re-run `trends`, and see whether failure rate and startup
+  overhead actually moved — the before/after measurement from the roadmap.
+- Per-step timestamps are now threaded through signal extraction and appear
+  in `--json` steps (additive `timestamp` field).
+
 ## [0.10.0] - 2026-07-12
 
 ### Added

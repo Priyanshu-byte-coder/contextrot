@@ -374,6 +374,67 @@ def agents(
 
 
 @app.command()
+def trends(
+    data_dir: DataDir = None,
+    days: Days = 90,
+    window: Window = None,
+    weeks: Annotated[
+        int, typer.Option("--weeks", "-w", help="How many recent weeks to show.")
+    ] = 8,
+) -> None:
+    """Week-over-week trend — is your context hygiene improving?
+
+    This is also the before/after check for `contextrot fix`: change your
+    setup, keep working, re-run trends and watch whether failure rate and
+    startup overhead actually moved.
+    """
+    from contextrot.analysis.trends import build_trend, trend_verdict
+
+    result = analyze(data_dir=data_dir, project_filter=None, days=days, window_override=window)
+    if not result.sessions:
+        console.print("[yellow]No sessions found.[/yellow]")
+        raise typer.Exit(code=1)
+
+    trend = build_trend(result.steps, weeks=weeks)
+    if not trend:
+        console.print(
+            "[yellow]No timestamped steps found[/yellow] — trends need transcripts "
+            "that record per-step timestamps."
+        )
+        raise typer.Exit(code=1)
+
+    kind, text = trend_verdict(trend)
+    style = {"improving": "green", "worsening": "red", "flat": "cyan", "insufficient": "yellow"}[
+        kind
+    ]
+    console.print(f"[{style} bold]{text}[/]")
+    console.print()
+
+    table = Table(title=f"Last {len(trend)} weeks")
+    table.add_column("Week of", style="cyan")
+    table.add_column("Steps", justify="right", style="dim")
+    table.add_column("Failure", justify="right")
+    table.add_column("95% CI", justify="right", style="dim")
+    table.add_column("Avg fill", justify="right")
+    table.add_column("Startup tokens", justify="right")
+
+    for w in trend:
+        ci = f"{w.ci[0]:.0%}–{w.ci[1]:.0%}"
+        startup = f"{w.startup_tokens:,}" if w.startup_tokens is not None else "n/a"
+        thin = " [dim]*[/dim]" if w.steps < 30 else ""
+        table.add_row(
+            w.label,
+            f"{w.steps}{thin}",
+            f"{w.rate:.1%}",
+            ci,
+            f"{w.avg_fill:.0f}%",
+            startup,
+        )
+    console.print(table)
+    console.print("[dim]* fewer than 30 steps — too thin to weigh in the trend.[/dim]")
+
+
+@app.command()
 def fix(
     data_dir: DataDir = None,
     days: Days = 30,

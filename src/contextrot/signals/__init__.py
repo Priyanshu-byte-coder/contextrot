@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from contextrot.models import Session
 
@@ -84,6 +85,7 @@ class StepSignals:
     model: str
     project: str = ""
     source: str = ""  # adapter name, e.g. "claude-code"
+    timestamp: datetime | None = None
     tool_error: bool = False
     edit_failure: bool = False
     retry: bool = False
@@ -112,6 +114,7 @@ class StepSignals:
             "model": self.model,
             "project": self.project,
             "source": self.source,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             **{name: getattr(self, name) for name in SIGNAL_NAMES},
             "reversals_so_far": self.reversals_so_far,
             "reversal": self.reversal,
@@ -144,6 +147,7 @@ def extract_signals(session: Session, context_window: int) -> SessionSignals:
             model=step.model,
             project=session.project,
             source=session.source,
+            timestamp=step.timestamp,
             reversals_so_far=reversals_so_far,
             cost_usd=step_cost_usd(
                 step.input_tokens,

@@ -326,3 +326,15 @@ def test_uninstall_hook_removes_only_ours(tmp_path: Path):
     entries = data["hooks"]["PostToolUse"]
     assert len(entries) == 1
     assert entries[0]["hooks"][0]["command"] == "lint.sh"
+
+
+def test_trends_subcommand_on_fixture(tmp_path: Path):
+    result = runner.invoke(
+        app,
+        ["trends", "--data-dir", str(FIXTURES), "--days", "0"],
+        env={"NO_COLOR": "1"},
+    )
+    # The single tiny fixture session either yields a thin one-week trend
+    # (insufficient) or runs clean — both are exit 0 with a verdict line.
+    assert result.exit_code == 0
+    assert "trend" in result.output.lower() or "Week of" in result.output

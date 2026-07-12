@@ -98,6 +98,8 @@ contextrot install hook         # one-time in-session warning when you cross
 contextrot mcp                  # MCP stdio server — let any MCP-capable agent
                                 #   query your rot report mid-session
                                 #   (claude mcp add contextrot -- contextrot mcp)
+contextrot trends               # week-over-week: is your hygiene improving?
+                                #   (the before/after check for `fix`)
 contextrot fix                  # dry-run: prescriptions + unused MCP servers +
                                 #   CLAUDE.md size. Add --apply to disable unused
                                 #   *global* MCP servers (backs up first, reversible)
