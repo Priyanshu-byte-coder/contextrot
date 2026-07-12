@@ -4,6 +4,21 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [0.12.0] - 2026-07-12
+
+### Added
+
+- **`contextrot badge`** — a shields-style SVG badge of your verdict
+  (`context rot | clean ✓`, `edge · knee ~70%`, `rot ✗ 3.2×`), rendered
+  entirely locally: embed your measured result in a README, blog post, or
+  profile without any badge service seeing your data. Verdict colors match
+  every other report surface.
+
+### Fixed
+
+- `contextrot trends` default window is 90 days (a 30-day trend has too few
+  weeks to say anything).
+
 ## [0.11.0] - 2026-07-12
 
 ### Added

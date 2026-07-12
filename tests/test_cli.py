@@ -338,3 +338,22 @@ def test_trends_subcommand_on_fixture(tmp_path: Path):
     # (insufficient) or runs clean — both are exit 0 with a verdict line.
     assert result.exit_code == 0
     assert "trend" in result.output.lower() or "Week of" in result.output
+
+
+def test_badge_subcommand_writes_svg(tmp_path: Path):
+    out = tmp_path / "badge.svg"
+    result = runner.invoke(
+        app, ["badge", str(out), "--data-dir", str(FIXTURES), "--days", "0"]
+    )
+    assert result.exit_code == 0
+    svg = out.read_text(encoding="utf-8")
+    assert svg.startswith("<svg")
+    assert "context rot" in svg
+
+
+def test_badge_subcommand_directory_target(tmp_path: Path):
+    result = runner.invoke(
+        app, ["badge", str(tmp_path), "--data-dir", str(FIXTURES), "--days", "0"]
+    )
+    assert result.exit_code == 0
+    assert (tmp_path / "contextrot-badge.svg").exists()

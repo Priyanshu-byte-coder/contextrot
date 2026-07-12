@@ -103,6 +103,8 @@ contextrot trends               # week-over-week: is your hygiene improving?
 contextrot fix                  # dry-run: prescriptions + unused MCP servers +
                                 #   CLAUDE.md size. Add --apply to disable unused
                                 #   *global* MCP servers (backs up first, reversible)
+contextrot badge                # local SVG verdict badge for your README —
+                                #   no badge service sees your data
 contextrot sessions             # list what was parsed
 ```
 

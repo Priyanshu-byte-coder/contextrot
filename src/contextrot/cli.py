@@ -374,6 +374,41 @@ def agents(
 
 
 @app.command()
+def badge(
+    output: Annotated[
+        Optional[Path],
+        typer.Argument(help="Where to write the SVG (default: ./contextrot-badge.svg)."),
+    ] = None,
+    data_dir: DataDir = None,
+    project: ProjectF = None,
+    days: Days = 30,
+    window: Window = None,
+) -> None:
+    """Write a shields-style SVG badge of your verdict — rendered locally.
+
+    Embed your measured verdict ("context rot | clean ✓") in a README or
+    blog post without any badge service seeing your data.
+    """
+    result = analyze(data_dir=data_dir, project_filter=project, days=days, window_override=window)
+    if not result.sessions:
+        console.print("[yellow]No sessions found.[/yellow]")
+        raise typer.Exit(code=1)
+
+    from contextrot.report.badge import render_badge
+
+    out = output or Path("contextrot-badge.svg")
+    if out.is_dir():
+        out = out / "contextrot-badge.svg"
+    try:
+        out.write_text(render_badge(result), encoding="utf-8")
+    except OSError as e:
+        console.print(f"[red]Couldn't write badge to {out}:[/red] {e}")
+        raise typer.Exit(code=1) from e
+    console.print(f"[green]Badge written:[/green] {out}")
+    console.print(f"  Embed: ![context rot]({out.name})", markup=False)
+
+
+@app.command()
 def trends(
     data_dir: DataDir = None,
     days: Days = 90,
