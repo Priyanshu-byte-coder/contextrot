@@ -51,6 +51,26 @@ Every report leads with a plain verdict — one of four honest answers:
 
 A tool that can say "you're fine" is a tool you can trust when it says you're not.
 
+## What it does, in plain words
+
+One command reads the session logs your coding agent already saved and tells you where it starts getting worse. Everything runs on your machine. Here's the whole tool, by what you might want:
+
+| You want to… | Run | What you get back |
+|---|---|---|
+| See if your agent degrades — and where | `contextrot` | a plain verdict + the context-fill % where *you* start failing |
+| Look further back for tighter numbers | `contextrot --days 90` | the same report over more history |
+| Check just one repo | `contextrot -p myproject` | that project's own curve and verdict |
+| Get a report you can share | `contextrot --html report.html` | one local HTML file + a ready-to-post image card |
+| Find which of your repos rots first | `contextrot projects` | your projects ranked, worst-degrading first |
+| Find which agent rots first | `contextrot agents` | Claude Code vs Codex vs Gemini vs Cline, ranked on *your* work |
+| Know what to actually change | `contextrot fix` | plain fixes + a list of MCP servers you set up but never use (preview only, changes nothing) |
+| Check whether you're improving | `contextrot trends` | week-over-week failure rate and startup-bloat trend |
+| Put a status badge in your README | `contextrot badge` | a local SVG verdict badge — no badge service sees your data |
+
+Use more than one model? A head-to-head model comparison (Opus vs Sonnet vs Haiku, on your workload) shows up in the main report automatically.
+
+**And you can run it live inside Claude Code** — a context-health meter in your status bar, an in-session warning when you cross your own threshold, and a way for Claude Code to check its own rot mid-task. [See below.](#use-it-live-inside-claude-code)
+
 ## Why a benchmark can't tell you this
 
 Research ([Chroma's context-rot report](https://www.trychroma.com/research/context-rot), several 2026 papers) shows LLM output quality degrades as input context grows — even far below the window limit. But that research runs synthetic tasks in lab conditions. Your degradation point depends on *your* projects, *your* MCP setup, *your* model, *your* prompting style.
@@ -77,57 +97,62 @@ Work across several repos? `contextrot projects` does the same head-to-head by *
 
 Use more than one coding agent? `contextrot agents` compares them too — Claude Code vs Codex CLI vs Gemini CLI vs Cline, each with its own curve and verdict on a shared scale, measured on your workload rather than a benchmark's.
 
-## Commands
+## Command reference
+
+The [table above](#what-it-does-in-plain-words) explains each of these in plain words; this is the quick lookup.
 
 ```bash
 contextrot                      # full report, last 30 days
 contextrot --days 90            # more history = tighter statistics
 contextrot -p myproject         # one project only
-contextrot --html report.html   # shareable single-file report (still 100% local)
-                                #   includes a 1200×630 share card — save as PNG,
-                                #   post it; and a per-model comparison when you
-                                #   use more than one model
-contextrot --json               # every number, recomputable
+contextrot --html report.html   # shareable single-file report + share card (100% local)
+contextrot --json               # every number, machine-readable
 contextrot projects             # rank your projects — which repo rots first
 contextrot agents               # rank your coding agents — which CLI rots first
-contextrot install statusline   # live context-health segment in Claude Code's
-                                #   statusline, colored by YOUR measured curve
-                                #   (dry-run by default; --apply to write)
-contextrot install hook         # one-time in-session warning when you cross
-                                #   your measured degradation threshold
-contextrot mcp                  # MCP stdio server — let any MCP-capable agent
-                                #   query your rot report mid-session
-                                #   (claude mcp add contextrot -- contextrot mcp)
-contextrot trends               # week-over-week: is your hygiene improving?
-                                #   (the before/after check for `fix`)
-contextrot fix                  # dry-run: prescriptions + unused MCP servers +
-                                #   CLAUDE.md size. Add --apply to disable unused
-                                #   *global* MCP servers (backs up first, reversible)
-contextrot badge                # local SVG verdict badge for your README —
-                                #   no badge service sees your data
+contextrot fix                  # what to change (dry-run; --apply to act, backs up first)
+contextrot trends               # week-over-week: are you improving?
+contextrot badge                # local SVG verdict badge for your README
 contextrot sessions             # list what was parsed
+
+# Live inside Claude Code (see next section):
+contextrot install statusline   # context-health meter in your status bar
+contextrot install hook         # one in-session warning when you cross your threshold
+contextrot mcp                  # let Claude Code query your rot report mid-session
 ```
 
-## Live statusline (Claude Code)
+## Use it live inside Claude Code
 
-The report tells you where you degrade; the statusline tells you **while it's
-happening**. After `contextrot install statusline --apply`, Claude Code's
-status bar shows your current context fill colored against your *own* measured
-curve — not a generic "yellow at 70%":
+The report tells you where you degrade *after the fact*. These three put it **in front of you while you're working** — and they're the reason a Claude Code user gets the most out of contextrot. All three are dry-run by default, write only with `--apply`, back up your settings first, and undo cleanly with `contextrot uninstall`.
+
+### 1. A live context-health meter in your status bar
+
+```bash
+contextrot install statusline --apply
+```
+
+Claude Code's status bar shows your current context fill, colored against your *own* measured curve — not a generic "yellow at 70%":
 
 ```
 ctx 72% ███████░░░ · ▲ past your knee (~70%) · fail here 4.8% (1.5× fresh)
 ```
 
-Every plain `contextrot` run recalibrates it from your latest data. Other
-statusline tools show cost and a hardcoded threshold; this one knows where
-*you* start failing. Dry-run by default, backed up, reversible with
-`contextrot uninstall statusline`.
+Other statusline tools show cost and a hardcoded threshold; this one knows where *you* start failing, and every plain `contextrot` run recalibrates it from your latest sessions.
 
-Prefer an active nudge over a passive bar? `contextrot install hook` registers
-a PostToolUse hook that warns **once** — the moment a session crosses your
-measured threshold — then stays quiet until the next crossing. If your curve
-has no knee, it says nothing at all: no generic scare thresholds.
+### 2. A one-time warning the moment you cross your threshold
+
+```bash
+contextrot install hook --apply
+```
+
+Prefer an active nudge over a passive bar? This registers a hook that warns **once** — the instant a session crosses *your* measured failure threshold — then stays quiet until the next crossing. If your curve has no threshold, it says nothing at all: no generic scare popups.
+
+### 3. Let Claude Code check its own rot, mid-task
+
+```bash
+claude mcp add contextrot -- contextrot mcp
+```
+
+This runs contextrot as an MCP server, so Claude Code itself can pull your rot report during a session — and decide to compact, warn you, or switch models based on your real numbers. It exposes three tools to the agent: `rot_report`, `agents_ranking`, and `prescriptions`. Still zero network — it's a local pipe, not a socket.
 
 ## How is this different from…
 
