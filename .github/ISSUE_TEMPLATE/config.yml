@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Share your rot curve / ask a question
+    url: https://github.com/Priyanshu-byte-coder/contextrot/discussions
+    about: Post results, questions, and ideas in Discussions — flat curves welcome too.
+  - name: 📖 Build an adapter (paved first PR)
+    url: https://github.com/Priyanshu-byte-coder/contextrot/blob/main/CONTRIBUTING.md
+    about: Adding support for another agent CLI is one small file with a fixture and a test.

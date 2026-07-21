@@ -1,0 +1,56 @@
+name: Share your rot curve
+description: Show what contextrot found on your sessions — flat curves count too
+labels: [share-your-curve]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for running it! Real-workload results (rot, edge, or clean) help
+        everyone understand where coding agents actually degrade. Nothing here is
+        required — share as much as you're comfortable with. **Please don't paste
+        anything private**; the numbers below are enough.
+  - type: dropdown
+    id: verdict
+    attributes:
+      label: Your verdict
+      options:
+        - "✗ Context rot detected"
+        - "! Edge rot"
+        - "✓ No measurable rot"
+        - "? Not enough data yet"
+    validations:
+      required: true
+  - type: input
+    id: knee
+    attributes:
+      label: Degradation threshold (if any)
+      placeholder: "~70% context fill / none"
+  - type: input
+    id: numbers
+    attributes:
+      label: Fresh vs deep failure rate + ratio
+      placeholder: "3.3% fresh vs 4.8% deep (1.5×)"
+  - type: input
+    id: scale
+    attributes:
+      label: Sessions / steps analyzed
+      placeholder: "66 sessions, 7,141 steps"
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Which agent(s)?
+      multiple: true
+      options:
+        - Claude Code
+        - Codex CLI
+        - Gemini CLI
+        - Qwen Code
+        - OpenCode
+        - Cline
+        - Roo Code
+        - Kilo Code
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything surprising?
+      description: A model that rotted way earlier than another, startup overhead, a project that stood out…

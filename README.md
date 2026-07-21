@@ -38,6 +38,7 @@ That's it. No config, no API keys, no uploads. contextrot reads the session tran
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/Priyanshu-byte-coder/contextrot/main/assets/screenshot.png" alt="contextrot terminal report: verdict, rot curve by context fill with confidence intervals, context composition, and prescriptions" width="900">
+  <p><strong><a href="SHOWCASE.md">📸 See every feature in action →</a></strong></p>
 </div>
 
 Every report leads with a plain verdict — one of four honest answers:
