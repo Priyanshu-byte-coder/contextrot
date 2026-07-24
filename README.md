@@ -183,13 +183,15 @@ contextrot makes **zero network calls**. Local files in, terminal/local HTML out
 | Agent | Status |
 |---|---|
 | Claude Code | ✅ today |
-| OpenCode | ✅ today — community-contributed |
+| OpenCode | ✅ today — both the current file storage and legacy `opencode.db` |
 | Codex CLI | ✅ today |
 | Gemini CLI | ✅ today |
 | Qwen Code | ✅ today — same recording format as Gemini CLI |
 | Cline (VS Code) | ✅ today |
 | Roo Code (VS Code) | ✅ today |
 | Kilo Code (VS Code) | ✅ today |
+| Google Antigravity | 🔬 investigating — it does keep local session/token files, so it's the most promising IDE to add next |
+| Cursor / Windsurf | ⚠️ blocked for now — their local stores rarely record per-message token counts, so context fill can't be computed reliably |
 | Kiro CLI | ❌ blocked upstream — its transcripts record no token counts, so context fill can't be computed |
 | OpenTelemetry GenAI spans | planned |
 

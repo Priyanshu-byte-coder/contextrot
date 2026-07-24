@@ -4,6 +4,22 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [1.0.1] - 2026-07-24
+
+### Fixed
+
+- **OpenCode: daily users were being read as "not enough data."** Recent
+  OpenCode versions store sessions as JSON files under
+  `<data>/storage/{session,message,part,project}/…` rather than the single
+  `opencode.db` the adapter expected — so an active OpenCode user's history
+  was invisible and the run fell back to "insufficient." The adapter now reads
+  the **file-based storage** (current) *and* keeps the **SQLite** path as a
+  fallback for older installs, and probes the real per-OS data directories
+  (Linux/macOS `~/.local/share/opencode`, Windows `%APPDATA%`/`%LOCALAPPDATA%`)
+  plus `OPENCODE_DATA_DIR` / `XDG_DATA_HOME`, so no `--data-dir` is needed.
+  Per-session `--days` filtering now works too (each session file carries its
+  own mtime, where the single DB could not).
+
 ## [1.0.0] - 2026-07-12
 
 The 1.0 milestone. Everything below is now considered stable surface:
