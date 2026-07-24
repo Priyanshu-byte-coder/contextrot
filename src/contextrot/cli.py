@@ -220,6 +220,17 @@ def main(
 
         render(result, console)
 
+        # The most common false alarm: a short --days window hides enough
+        # history for a verdict. If we came up short but there's likely more
+        # on disk, point the way instead of just saying "keep using your agent".
+        if result.verdict_kind == "insufficient" and days != 0:
+            wider = "--days 90" if days < 90 else "--days 0"
+            console.print(
+                f"[dim]Tip: only the last {days} days were analyzed. "
+                f"Try [/dim][cyan]contextrot {wider}[/cyan][dim] "
+                "(0 = all history) to include more sessions.[/dim]"
+            )
+
     if html is not None:
         from contextrot.report import render_html
 

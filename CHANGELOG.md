@@ -4,6 +4,17 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [1.0.2] - 2026-07-24
+
+### Changed
+
+- **"Not enough data" now tells you what to do about it.** The most common
+  false alarm is a short `--days` window hiding enough history for a verdict
+  (e.g. a low-volume day-to-day user on the default 30-day window). When a run
+  comes up short, the report now suggests widening the range
+  (`contextrot --days 90`, or `--days 0` for all history) instead of only
+  "keep using your agent." No behavior change to the analysis itself.
+
 ## [1.0.1] - 2026-07-24
 
 ### Fixed

@@ -15,6 +15,46 @@ def test_default_report_runs():
     assert "context rot report" in result.output
 
 
+def _tiny_claude_fixture(root: Path) -> None:
+    """A handful of recent Claude Code steps — enough to parse, too few for a verdict."""
+    import uuid
+    from datetime import datetime, timedelta, timezone
+
+    d = root / "-home-dev-demo"
+    d.mkdir(parents=True, exist_ok=True)
+    now = datetime.now(timezone.utc)
+    lines = []
+    for k in range(8):
+        ts = (now - timedelta(hours=1, minutes=k)).isoformat()
+        tuid = f"t{k}"
+        lines.append(json.dumps({"type": "assistant", "timestamp": ts, "cwd": "/home/dev/demo",
+            "message": {"model": "claude-opus-4-8", "usage": {"input_tokens": 200,
+                "cache_creation_input_tokens": 0, "cache_read_input_tokens": k * 15000,
+                "output_tokens": 100},
+                "content": [{"type": "tool_use", "id": tuid, "name": "Read",
+                             "input": {"file_path": f"x{k}.py"}}]}}))
+        lines.append(json.dumps({"type": "user", "cwd": "/home/dev/demo",
+            "message": {"content": [{"type": "tool_result", "tool_use_id": tuid,
+                                     "is_error": False, "content": "ok"}]}}))
+    (d / f"{uuid.uuid4()}.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def test_insufficient_verdict_suggests_wider_days(tmp_path: Path):
+    _tiny_claude_fixture(tmp_path)
+    result = runner.invoke(app, ["--data-dir", str(tmp_path), "--days", "30"],
+                           env={"NO_COLOR": "1"})
+    assert result.exit_code == 0
+    assert "Tip:" in result.output and "--days 90" in result.output
+
+
+def test_all_history_run_has_no_days_tip(tmp_path: Path):
+    _tiny_claude_fixture(tmp_path)
+    result = runner.invoke(app, ["--data-dir", str(tmp_path), "--days", "0"],
+                           env={"NO_COLOR": "1"})
+    assert result.exit_code == 0
+    assert "Tip:" not in result.output  # already all history — nothing to widen
+
+
 def test_json_output_shape():
     result = runner.invoke(app, ["--data-dir", str(FIXTURES), "--days", "0", "--json"])
     assert result.exit_code == 0
