@@ -80,11 +80,13 @@ def _build(root: Path) -> _Store:
     s.tool_part("a1p2", "a1", "read", target="/home/user/myapp/a.py",
                 output="def f():\n    return 1\n", call_id="t1")
 
-    s.assistant("a2", "ses_main", {"input": 40, "output": 60, "cache": {"read": 20000, "write": 9960}})
+    s.assistant("a2", "ses_main",
+                {"input": 40, "output": 60, "cache": {"read": 20000, "write": 9960}})
     s.tool_part("a2p1", "a2", "edit", target="/home/user/myapp/a.py",
                 status="error", error="Error: oldString not found in file", call_id="t2")
 
-    s.assistant("a3", "ses_main", {"input": 22, "output": 30, "cache": {"read": 130000, "write": 9978}})
+    s.assistant("a3", "ses_main",
+                {"input": 22, "output": 30, "cache": {"read": 130000, "write": 9978}})
     s.text_part("a3p1", "a3", "I apologize, let me fix that.")
     s.tool_part("a3p2", "a3", "edit", target="/home/user/myapp/a.py", output="ok", call_id="t3")
 
