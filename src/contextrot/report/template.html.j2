@@ -135,8 +135,16 @@
   </div>
 </div>
 
+<p class="sub" style="margin:0.5rem 0 0">
+  <strong>In plain words:</strong> “context fill” = how full the window is ·
+  “fresh” = nearly empty (start of a session) · “deep” = nearly full ·
+  a <em>slip</em> (failure signal) = a failed edit, a repeated tool call, a re-read,
+  an “actually, let me fix that,” or a tool error.
+</p>
+
 <div class="card">
-  <h2>Failure-signal rate by context fill</h2>
+  <h2>Does your agent get worse as its context fills?</h2>
+  <p class="sub" style="margin:-0.25rem 0 1rem">Each bar: how often the agent slipped while the context window was that full. Rising bars = it degrades as context fills.</p>
   <svg viewBox="0 0 860 300" width="100%" role="img" aria-label="Bar chart of failure-signal rate per context-fill bucket with 95 percent confidence whiskers">
     {# y grid #}
     {% for g in chart.gridlines %}
@@ -167,22 +175,24 @@
 
 {% if reversal_rows %}
 <div class="card">
-  <h2>Failure-signal rate by prior reversal count</h2>
+  <h2>Do mistakes snowball?</h2>
+  <p class="sub" style="margin:-0.25rem 0 1rem">A <em>reversal</em> is the agent undoing or contradicting itself — a failed edit, a retry after an error, or an “actually, let me fix that.” This asks: once a session already has a few reversals, how often does the very <strong>next</strong> step fail? A rising rate means mistakes compound — and a fresh session breaks the spiral.</p>
   <table>
-    <thead><tr><th>Prior reversals</th><th>Steps</th><th>Degraded</th><th>Rate</th><th>95% CI</th></tr></thead>
+    <thead><tr><th>Reversals so far</th><th>Steps</th><th>Degraded</th><th>Next-step slip rate</th><th>95% CI</th></tr></thead>
     <tbody>
       {% for b in reversal_rows %}
       <tr><td>{{ b.range }}{% if b.low_conf %}*{% endif %}</td><td>{{ b.n }}</td><td>{{ b.degraded }}</td><td>{{ b.rate }}</td><td>{{ b.ci }}</td></tr>
       {% endfor %}
     </tbody>
   </table>
-  <p class="sub" style="margin:0.75rem 0 0">Buckets use reversals observed before the step, so same-step failures do not explain themselves. * fewer than 15 steps.</p>
+  <p class="sub" style="margin:0.75rem 0 0">Reversals are counted <em>before</em> each step, so a step's own failure can't explain itself. * fewer than 15 steps — read with caution.</p>
 </div>
 {% endif %}
 
 {% if models %}
 <div class="card">
-  <h2>By model</h2>
+  <h2>By model — which model holds up best on your work</h2>
+  <p class="sub" style="margin:-0.25rem 0 1rem"><strong>Fresh rate</strong> = slips at near-empty context · <strong>Deep rate</strong> = at near-full · <strong>Ratio</strong> = Deep ÷ Fresh (1× = no rot, higher = worse) · <strong>Threshold</strong> = fill where slips start climbing.</p>
   <table>
     <thead><tr><th>Model</th><th>Steps</th><th>Fresh rate</th><th>Deep rate</th><th>Ratio</th><th>Threshold</th><th>Verdict</th></tr></thead>
     <tbody>
@@ -220,7 +230,7 @@
 
 {% if projects %}
 <div class="card">
-  <h2>By project</h2>
+  <h2>By project — which repo degrades first</h2>
   <table>
     <thead><tr><th>Project</th><th>Steps</th><th>Fresh rate</th><th>Deep rate</th><th>Ratio</th><th>Threshold</th><th>Verdict</th></tr></thead>
     <tbody>
@@ -258,7 +268,7 @@
 
 {% if agents %}
 <div class="card">
-  <h2>By agent</h2>
+  <h2>By coding agent — which CLI holds up best</h2>
   <table>
     <thead><tr><th>Agent</th><th>Steps</th><th>Fresh rate</th><th>Deep rate</th><th>Ratio</th><th>Threshold</th><th>Verdict</th></tr></thead>
     <tbody>

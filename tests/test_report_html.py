@@ -157,7 +157,7 @@ def test_agent_section_present_with_two_agents(tmp_path: Path):
         for i, f in enumerate([15.0, 75.0] * 100)
     ]
     html = _render(_result(steps), tmp_path)
-    assert "By agent" in html
+    assert "By coding agent" in html
     assert "Claude Code" in html and "Codex CLI" in html
     assert "http://" not in html
 

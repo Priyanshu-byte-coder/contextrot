@@ -4,6 +4,27 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [1.1.0] - 2026-07-24
+
+### Changed
+
+- **The report now explains itself in plain English.** A first-time reader no
+  longer needs to know what a "reversal," "fresh/deep context," or a "knee" is:
+  - Every section leads with one plain sentence saying what it shows and why it
+    matters, and the terminal report is broken into labelled stages with rules.
+  - The opaque "Failure-signal rate by prior reversal count" table is now
+    **"Do mistakes snowball?"** — it defines a reversal (the agent undoing or
+    contradicting itself) and prints a data-driven takeaway ("Yes, mistakes
+    snowball… a fresh session breaks the spiral" / "No snowball here").
+  - The fill chart, comparison tables, and composition panel gained legends
+    (green = healthy zone / red = past threshold; Fresh = near-empty, Deep =
+    near-full, Ratio = Deep ÷ Fresh, Threshold = where slips climb) and friendly
+    column names ("Slip rate", "steps", "give-or-take" for the 95% CI).
+  - The HTML report carries the same plain-language glosses and a one-line
+    glossary under the hero.
+- Refreshed the showcase screenshots to the new look. No change to the analysis,
+  the JSON schema, or any numbers — wording and layout only.
+
 ## [1.0.2] - 2026-07-24
 
 ### Changed
