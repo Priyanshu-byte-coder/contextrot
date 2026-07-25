@@ -89,6 +89,30 @@ def load_sessions(
     return sessions, skipped
 
 
+def _session_window(session, window_override: int | None) -> int:
+    """The context window to measure this session's fill against.
+
+    Authoritative sources win: an explicit ``--window`` override, then a window
+    the transcript states about itself (Codex records its own). Otherwise look up
+    every model the session used — sessions switch models mid-run, so the first
+    step's model isn't representative — and take the largest. Finally, let the
+    data correct a guess that can't be true: a prompt bigger than the window we
+    assumed means we guessed too small (see ``pricing.infer_window``).
+    """
+    from contextrot.pricing import infer_window
+
+    stated = window_override or session.context_window_hint
+    if stated:
+        return int(stated)
+
+    models = {st.model for st in session.steps if st.model}
+    guess = max(
+        (context_window_for(m) for m in models),
+        default=DEFAULT_CONTEXT_WINDOW,
+    )
+    return infer_window(session.peak_prompt_tokens, guess)
+
+
 def analyze(
     data_dir: Path | None = None,
     project_filter: str | None = None,
@@ -100,8 +124,7 @@ def analyze(
     all_steps: list[StepSignals] = []
     window = window_override or DEFAULT_CONTEXT_WINDOW
     for s in sessions:
-        model = s.steps[0].model if s.steps else ""
-        session_window = context_window_for(model, window_override or s.context_window_hint)
+        session_window = _session_window(s, window_override)
         window = max(window, session_window)
         all_steps.extend(extract_signals(s, session_window).steps)
 

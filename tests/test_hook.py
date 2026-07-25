@@ -29,9 +29,17 @@ def _cal(knee=70.0, steps: int = 5000) -> Calibration:
 
 
 def _transcript(
-    tmp_path: Path, prompt_tokens: int, model="claude-opus-4-8", name="transcript.jsonl"
+    tmp_path: Path, fill_pct: float, model="claude-opus-4-8", name="transcript.jsonl"
 ) -> Path:
-    """Claude Code-shaped transcript whose last assistant step has the given usage."""
+    """Claude Code-shaped transcript whose last step sits at ``fill_pct`` of the window.
+
+    Token counts are derived from the model's real context window rather than
+    hardcoded, so these tests keep testing *fill* behavior when a model's window
+    changes (as Anthropic's frontier models did when they moved to 1M).
+    """
+    from contextrot.pricing import context_window_for
+
+    prompt_tokens = int(fill_pct / 100.0 * context_window_for(model))
     path = tmp_path / name
     lines = [
         json.dumps({"type": "user", "message": {"content": "hi"}}),
@@ -57,8 +65,7 @@ def _transcript(
 
 
 def test_tail_fill_pct_reads_last_usage(tmp_path: Path):
-    # 150k of a 200k window (claude-opus) = 75%.
-    t = _transcript(tmp_path, 150_000)
+    t = _transcript(tmp_path, 75)
     fill = tail_fill_pct(t)
     assert fill == pytest.approx(75.0, abs=0.5)
 
@@ -68,7 +75,7 @@ def test_tail_fill_pct_missing_file(tmp_path: Path):
 
 
 def test_warns_once_past_knee(tmp_path: Path):
-    t = _transcript(tmp_path, 150_000)  # 75% > knee 70%
+    t = _transcript(tmp_path, 75)  # 75% > knee 70%
     payload = {"session_id": "s1", "transcript_path": str(t)}
     msg = evaluate(payload, _cal())
     assert msg is not None
@@ -80,23 +87,23 @@ def test_warns_once_past_knee(tmp_path: Path):
 
 
 def test_rearms_after_compact(tmp_path: Path):
-    high_t = _transcript(tmp_path, 150_000, name="high.jsonl")
+    high_t = _transcript(tmp_path, 75, name="high.jsonl")
     high = {"session_id": "s2", "transcript_path": str(high_t)}
     assert evaluate(high, _cal()) is not None
     # Fill drops well below the knee (compact) → marker cleared → warns again.
-    low_t = _transcript(tmp_path, 40_000, name="low.jsonl")  # 20%
+    low_t = _transcript(tmp_path, 20, name="low.jsonl")
     low = {"session_id": "s2", "transcript_path": str(low_t)}
     assert evaluate(low, _cal()) is None
     assert evaluate(high, _cal()) is not None
 
 
 def test_silent_below_knee(tmp_path: Path):
-    t = _transcript(tmp_path, 100_000)  # 50%
+    t = _transcript(tmp_path, 50)
     assert evaluate({"session_id": "s3", "transcript_path": str(t)}, _cal()) is None
 
 
 def test_silent_without_calibration_or_knee(tmp_path: Path):
-    t = _transcript(tmp_path, 190_000)
+    t = _transcript(tmp_path, 95)
     payload = {"session_id": "s4", "transcript_path": str(t)}
     assert evaluate(payload, None) is None
     assert evaluate(payload, _cal(knee=None)) is None

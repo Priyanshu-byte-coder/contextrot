@@ -1,33 +1,58 @@
-"""Claude Code statusline segment.
+"""One-line context-health segment, for any status bar.
 
-Claude Code pipes session JSON to the configured statusline command on
-stdin (see https://code.claude.com/docs/en/statusline) and displays
-whatever the command prints. This renderer turns that JSON plus the
-user's calibration snapshot into a one-line context-health segment:
+Two ways in:
 
-    ctx 72% ███████░░░ ▲ past your knee (~70%) · fail here 4.8% (1.5× fresh)
+- **Claude Code** pipes session JSON to the configured statusline command on
+  stdin (https://code.claude.com/docs/en/statusline) and displays what it
+  prints — ``render_statusline(payload, cal)``.
+- **Everything else** (tmux, Starship, a shell prompt, Waybar, any agent that
+  offers no statusline hook) asks contextrot for the current fill instead of
+  pushing it — ``render_fill(fill_pct, cal, palette)``, driven by
+  ``contextrot.live.detect_live_session``.
 
-The coloring is the point: generic statuslines go yellow at a hardcoded
-70%; this one goes red where *your* measured failure curve says it
-should. Uncalibrated (no report run yet, or too little data) falls back
-to generic 70/90 thresholds and says so.
+Both render the same line::
 
-Never raises: a statusline that crashes renders as an empty bar, so every
-path degrades to printable text.
+    ctx 72% ███████░░░ · ▲ past your knee (~70%) · fail here 4.8% (1.5× fresh)
+
+The coloring is the point: generic statuslines go yellow at a hardcoded 70%;
+this one goes red where *your* measured failure curve says it should.
+Uncalibrated (no report run yet, or too little data) falls back to generic
+70/90 thresholds and says so.
+
+Never raises: a statusline that crashes renders as an empty bar, so every path
+degrades to printable text.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from contextrot.calibration import Calibration
 
-# ANSI codes; Claude Code renders these in the statusline row.
-_GREEN = "\x1b[32m"
-_YELLOW = "\x1b[33m"
-_RED = "\x1b[31m"
-_DIM = "\x1b[2m"
-_RESET = "\x1b[0m"
-
 _BAR_CELLS = 10
+
+
+@dataclass(frozen=True)
+class Palette:
+    """Color markup for one output target."""
+
+    green: str
+    yellow: str
+    red: str
+    dim: str
+    reset: str
+
+
+# ANSI escapes; Claude Code and shell prompts render these directly.
+ANSI = Palette("\x1b[32m", "\x1b[33m", "\x1b[31m", "\x1b[2m", "\x1b[0m")
+# No markup at all — for anything that would show the escapes literally.
+PLAIN = Palette("", "", "", "", "")
+# tmux status bars do NOT interpret ANSI; they use their own #[...] tags.
+TMUX = Palette(
+    "#[fg=green]", "#[fg=yellow]", "#[fg=red]", "#[fg=colour244]", "#[default]"
+)
+
+PALETTES = {"ansi": ANSI, "plain": PLAIN, "tmux": TMUX}
 
 
 def _bar(pct: float) -> str:
@@ -36,20 +61,58 @@ def _bar(pct: float) -> str:
     return "█" * filled + "░" * (_BAR_CELLS - filled)
 
 
-def _zone(fill: float, knee: float | None) -> str:
+def _zone(fill: float, knee: float | None, p: Palette) -> str:
     """green / yellow / red for the current fill against the knee."""
     if knee is not None:
         if fill >= knee:
-            return _RED
+            return p.red
         if fill >= knee - 10:
-            return _YELLOW
-        return _GREEN
+            return p.yellow
+        return p.green
     # Uncalibrated: generic thresholds.
     if fill >= 90:
-        return _RED
+        return p.red
     if fill >= 70:
-        return _YELLOW
-    return _GREEN
+        return p.yellow
+    return p.green
+
+
+def render_fill(fill_pct: float, cal: Calibration | None, palette: Palette = ANSI) -> str:
+    """The status line for a known context fill. Never raises."""
+    try:
+        return _render_fill(fill_pct, cal, palette)
+    except Exception:  # noqa: BLE001 — a broken statusline helps nobody
+        return "ctx —"
+
+
+def _render_fill(fill_pct: float, cal: Calibration | None, p: Palette) -> str:
+    calibrated = cal is not None and cal.calibrated
+    knee = cal.knee_pct if calibrated and cal is not None else None
+
+    fill = max(0.0, min(100.0, float(fill_pct)))
+    color = _zone(fill, knee, p)
+    parts = [f"ctx {color}{fill:.0f}% {_bar(fill)}{p.reset}"]
+
+    if calibrated and cal is not None:
+        if knee is not None:
+            if fill >= knee:
+                parts.append(f"{p.red}▲ past your knee (~{knee:.0f}%){p.reset}")
+            else:
+                parts.append(f"{p.dim}knee ~{knee:.0f}%{p.reset}")
+        else:
+            parts.append(f"{p.dim}no knee in your data{p.reset}")
+
+        rate = cal.rate_at_fill(fill)
+        if rate is not None and cal.low_fill_rate > 0:
+            ratio = rate / cal.low_fill_rate
+            note = f"fail here {rate * 100:.1f}%"
+            if ratio >= 1.25:
+                note += f" ({ratio:.1f}× fresh)"
+            parts.append(note)
+    else:
+        parts.append(f"{p.dim}run contextrot to calibrate{p.reset}")
+
+    return " · ".join(parts)
 
 
 def render_statusline(payload: dict, cal: Calibration | None) -> str:
@@ -72,32 +135,8 @@ def _render(payload: dict, cal: Calibration | None) -> str:
         # sends null here — show the calibration context instead of a bar.
         if calibrated:
             if knee is not None:
-                return f"ctx — {_DIM}knee ~{knee:.0f}%{_RESET}"
+                return f"ctx — {ANSI.dim}knee ~{knee:.0f}%{ANSI.reset}"
             return "ctx —"
-        return f"ctx — {_DIM}run contextrot to calibrate{_RESET}"
+        return f"ctx — {ANSI.dim}run contextrot to calibrate{ANSI.reset}"
 
-    fill = max(0.0, min(100.0, float(used)))
-    color = _zone(fill, knee)
-    parts = [f"ctx {color}{fill:.0f}% {_bar(fill)}{_RESET}"]
-
-    if calibrated and cal is not None:
-        if knee is not None:
-            if fill >= knee:
-                marker = f"{_RED}▲ past your knee (~{knee:.0f}%){_RESET}"
-            else:
-                marker = f"{_DIM}knee ~{knee:.0f}%{_RESET}"
-            parts.append(marker)
-        else:
-            parts.append(f"{_DIM}no knee in your data{_RESET}")
-
-        rate = cal.rate_at_fill(fill)
-        if rate is not None and cal.low_fill_rate > 0:
-            ratio = rate / cal.low_fill_rate
-            note = f"fail here {rate * 100:.1f}%"
-            if ratio >= 1.25:
-                note += f" ({ratio:.1f}× fresh)"
-            parts.append(note)
-    else:
-        parts.append(f"{_DIM}run contextrot to calibrate{_RESET}")
-
-    return " · ".join(parts)
+    return _render_fill(float(used), cal, ANSI)

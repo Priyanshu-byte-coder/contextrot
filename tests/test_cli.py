@@ -39,6 +39,64 @@ def _tiny_claude_fixture(root: Path) -> None:
     (d / f"{uuid.uuid4()}.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def test_status_formats(tmp_path: Path):
+    _tiny_claude_fixture(tmp_path)
+    plain = runner.invoke(app, ["status", "--format", "plain", "--within", "0",
+                                "--data-dir", str(tmp_path)], env={"NO_COLOR": "1"})
+    assert plain.exit_code == 0
+    assert "ctx" in plain.output
+    assert "\x1b[" not in plain.output  # no ANSI escapes in plain mode
+
+    tmux = runner.invoke(app, ["status", "--format", "tmux", "--within", "0",
+                               "--data-dir", str(tmp_path)])
+    assert tmux.exit_code == 0
+    assert "#[fg=" in tmux.output  # tmux markup, not ANSI
+
+    as_json = runner.invoke(app, ["status", "--format", "json", "--within", "0",
+                                  "--data-dir", str(tmp_path)])
+    assert as_json.exit_code == 0
+    payload = json.loads(as_json.output)
+    assert payload["live"] is True
+    assert 0 <= payload["fill_pct"] <= 100
+    assert payload["agent"] == "claude-code"
+
+
+def test_status_quiet_when_nothing_live(tmp_path: Path):
+    # No transcripts at all → a status bar should stay empty, not show noise.
+    result = runner.invoke(app, ["status", "--data-dir", str(tmp_path)])
+    assert result.exit_code == 0
+    assert result.output.strip() == ""
+
+
+def test_status_setup_prints_snippet_and_writes_nothing(tmp_path: Path):
+    before = sorted(p.name for p in tmp_path.iterdir())
+    result = runner.invoke(app, ["status", "--setup", "tmux"], env={"NO_COLOR": "1"})
+    assert result.exit_code == 0
+    assert "status-right" in result.output and "contextrot status" in result.output
+    assert sorted(p.name for p in tmp_path.iterdir()) == before
+
+
+def test_status_rejects_unknown_format(tmp_path: Path):
+    result = runner.invoke(app, ["status", "--format", "yaml", "--data-dir", str(tmp_path)])
+    assert result.exit_code == 1
+
+
+def test_doctor_reports_agents_and_readiness(tmp_path: Path):
+    _tiny_claude_fixture(tmp_path)
+    result = runner.invoke(app, ["doctor", "--data-dir", str(tmp_path), "--days", "0"],
+                           env={"NO_COLOR": "1"})
+    assert result.exit_code == 0
+    assert "claude-code" in result.output
+    assert "Context window in use" in result.output
+    assert "needed" in result.output  # the fresh/deep readiness lines
+
+
+def test_doctor_with_no_transcripts(tmp_path: Path):
+    result = runner.invoke(app, ["doctor", "--data-dir", str(tmp_path)], env={"NO_COLOR": "1"})
+    assert result.exit_code == 0
+    assert "No transcripts found" in result.output
+
+
 def test_insufficient_verdict_suggests_wider_days(tmp_path: Path):
     _tiny_claude_fixture(tmp_path)
     result = runner.invoke(app, ["--data-dir", str(tmp_path), "--days", "30"],
@@ -273,6 +331,12 @@ def test_hook_command_emits_system_message(tmp_path: Path):
         ),
         encoding="utf-8",
     )
+    from contextrot.pricing import context_window_for
+
+    # 80% of the model's real window — comfortably past the fixture's 70% knee,
+    # and derived rather than hardcoded so a window change can't silently make
+    # this transcript "shallow" and stop the hook from firing.
+    deep_tokens = int(0.80 * context_window_for("claude-opus-4-8"))
     transcript = tmp_path / "t.jsonl"
     transcript.write_text(
         _json.dumps(
@@ -280,7 +344,7 @@ def test_hook_command_emits_system_message(tmp_path: Path):
                 "type": "assistant",
                 "message": {
                     "model": "claude-opus-4-8",
-                    "usage": {"input_tokens": 150000, "output_tokens": 10},
+                    "usage": {"input_tokens": deep_tokens, "output_tokens": 10},
                 },
             }
         )

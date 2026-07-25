@@ -4,6 +4,50 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [1.2.0] - 2026-07-25
+
+### Fixed
+
+- **Context-fill percentages were wrong on every current frontier model.** The
+  window table still assumed 200k tokens for models that now ship **1M-token
+  context windows** (Claude Opus 5, Opus 4.8/4.7/4.6, Sonnet 5, Sonnet 4.6,
+  Fable 5), and `claude-opus-5` matched no entry at all so it fell back to the
+  200k default. Because the window is the denominator of every fill percentage,
+  a 364k-token prompt was reported as "100% full" instead of ~36% — which
+  inflated fill, misclassified deep-vs-fresh steps, and could invent a
+  degradation threshold out of the clamping. Windows and prices are now correct
+  (current Opus is $5/$25 per MTok, not $15/$75), matching is separator- and
+  case-insensitive, and the per-session window considers **every** model a
+  session used rather than only its first step's.
+  **Your verdict may change** — the previous one was measured against a wrong
+  window. If a verdict became "not enough data", `contextrot doctor` explains
+  exactly what's missing.
+- **Unknown models can no longer silently clamp at 100% fill.** A prompt cannot
+  exceed its own context window, so an observed peak above the assumed window
+  means the assumption is wrong (an agent's internal model codename, or a model
+  newer than this table). contextrot now steps up to the smallest real window
+  that fits the data instead of reporting everything as full.
+- **A calibration with an empty zone no longer kills the live surfaces.** When a
+  fill zone had no steps yet its rate is `null`, and loading that snapshot threw
+  — leaving the statusline and hook permanently stuck on "run contextrot to
+  calibrate".
+
+### Added
+
+- **`contextrot status` — live context health in any terminal, with any agent.**
+  Claude Code is the only agent CLI that can *push* session data into a command,
+  so contextrot now *pulls*: it finds whichever session is currently active
+  across every supported agent and prints one line. `--format ansi|plain|tmux|json`
+  (tmux status bars don't render ANSI, so `tmux` emits `#[fg=…]` tags; `json`
+  suits Waybar/polybar), `--within` to stay silent when nothing is live, and
+  `--setup tmux|starship|bash|zsh|fish` to print a copy-paste snippet (it only
+  prints — it never edits your config).
+- **`contextrot doctor` — why don't I have a verdict?** Lists every agent it
+  looked for and the exact paths searched, how many transcripts and steps each
+  contributed, how many fresh/deep steps a verdict still needs, the context
+  window in use, and whether the live surfaces are installed. Paths and counts
+  only — it never prints transcript contents.
+
 ## [1.1.0] - 2026-07-24
 
 ### Changed

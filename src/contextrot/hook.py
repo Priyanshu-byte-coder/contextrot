@@ -16,7 +16,6 @@ knee in the user's data, or an unreadable transcript all produce no output.
 from __future__ import annotations
 
 import contextlib
-import json
 import os
 import tempfile
 from pathlib import Path
@@ -39,45 +38,14 @@ def state_dir() -> Path:
 
 
 def tail_fill_pct(transcript_path: Path, max_bytes: int = _TAIL_BYTES) -> float | None:
-    """Context fill %% from the last assistant usage entry in a live transcript."""
-    from contextrot.pricing import context_window_for
+    """Context fill %% from the last usage entry in a live transcript.
 
-    try:
-        size = transcript_path.stat().st_size
-        with transcript_path.open("rb") as f:
-            if size > max_bytes:
-                f.seek(size - max_bytes)
-                f.readline()  # drop the partial first line
-            tail = f.read().decode("utf-8", errors="replace")
-    except OSError:
-        return None
+    Thin wrapper over :func:`contextrot.live.tail_fill`, which understands every
+    transcript shape that records per-step token usage (not just Claude Code's).
+    """
+    from contextrot.live import tail_fill
 
-    for line in reversed(tail.splitlines()):
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            entry = json.loads(line)
-        except ValueError:
-            continue
-        if not isinstance(entry, dict) or entry.get("type") != "assistant":
-            continue
-        message = entry.get("message")
-        if not isinstance(message, dict):
-            continue
-        usage = message.get("usage")
-        if not isinstance(usage, dict):
-            continue
-        prompt = (
-            int(usage.get("input_tokens") or 0)
-            + int(usage.get("cache_creation_input_tokens") or 0)
-            + int(usage.get("cache_read_input_tokens") or 0)
-        )
-        if prompt <= 0:
-            continue
-        window = context_window_for(str(message.get("model") or ""), None)
-        return min(100.0, 100.0 * prompt / max(window, 1))
-    return None
+    return tail_fill(transcript_path, max_bytes)
 
 
 def evaluate(payload: dict, cal: Calibration | None) -> str | None:

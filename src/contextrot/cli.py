@@ -14,6 +14,7 @@ from typing import Annotated, Optional
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 
 from contextrot import __version__
 from contextrot.analysis import analyze, load_sessions
@@ -582,6 +583,288 @@ def fix(
         "  Undo: restore the backup, or move the entries back from "
         "'contextrotDisabledMcpServers' to 'mcpServers'."
     )
+
+
+_SETUP_SNIPPETS = {
+    "tmux": """# contextrot in your tmux status bar (~/.tmux.conf)
+# Works with ANY coding agent — it reads whichever session is live.
+set -g status-interval 5
+set -ag status-right ' #(contextrot status --format tmux) '
+# reload with:  tmux source-file ~/.tmux.conf""",
+    "starship": """# contextrot as a Starship module (~/.config/starship.toml)
+[custom.contextrot]
+command = 'contextrot status --format plain'
+when = 'contextrot status --format plain'
+shell = ['sh', '-c']
+format = '[$output]($style) '
+style = 'bold yellow'""",
+    "bash": """# contextrot in your bash prompt (~/.bashrc)
+__contextrot_ps1() { contextrot status --format ansi 2>/dev/null; }
+PS1='$(__contextrot_ps1)\\n'"$PS1\"""",
+    "zsh": """# contextrot in your zsh prompt (~/.zshrc)
+__contextrot_ps1() { contextrot status --format ansi 2>/dev/null }
+setopt PROMPT_SUBST
+RPROMPT='$(__contextrot_ps1)'""",
+    "fish": """# contextrot in your fish prompt (~/.config/fish/functions/fish_right_prompt.fish)
+function fish_right_prompt
+    contextrot status --format plain 2>/dev/null
+end""",
+}
+
+
+@app.command()
+def doctor(
+    data_dir: DataDir = None,
+    days: Days = 30,
+) -> None:
+    """Explain what contextrot can and can't see — and why you have no verdict yet.
+
+    Run this when a report says "not enough data" or an agent you use is
+    missing: it shows which agents were found, where it looked, how many steps
+    each contributed, whether you have enough fresh/deep steps for a verdict,
+    and whether the live surfaces are installed. Paths and counts only — it
+    never prints your transcripts.
+    """
+    from contextrot.adapters import ADAPTERS
+    from contextrot.analysis import analyze, load_sessions
+    from contextrot.analysis.rot import HIGH_FILL_MIN, LOW_FILL_MAX, VERDICT_MIN_N
+    from contextrot.calibration import calibration_path, load_calibration
+
+    console.print()
+    console.rule("[bold]What contextrot can see[/bold]")
+    console.print()
+
+    found_any = False
+    table = Table(show_edge=False, pad_edge=False)
+    table.add_column("Agent", style="cyan")
+    table.add_column("Transcripts", justify="right")
+    table.add_column("Where it looked", style="dim", overflow="fold")
+
+    for name, adapter in ADAPTERS.items():
+        try:
+            paths = adapter.discover(data_dir)
+        except Exception as e:  # noqa: BLE001 — doctor must never crash
+            table.add_row(name, "[red]error[/red]", f"{type(e).__name__}: {e}")
+            continue
+        count = len({str(p) for p in paths})
+        where = str(paths[0].parent) if paths else _search_hint(name, data_dir)
+        if count:
+            found_any = True
+            table.add_row(name, f"[green]{count}[/green]", where)
+        else:
+            table.add_row(name, "[dim]none[/dim]", where)
+    console.print(table)
+    console.print()
+
+    if not found_any:
+        console.print(
+            "[yellow]No transcripts found for any supported agent.[/yellow] "
+            "If you do use one of these, point contextrot at its data folder with "
+            "--data-dir, and please open an issue with the path — that's usually a "
+            "storage-location change we should support."
+        )
+        return
+
+    sessions, skipped = load_sessions(data_dir, None, days)
+    result = analyze(data_dir=data_dir, project_filter=None, days=days)
+    steps = result.steps
+
+    console.rule("[bold]Do you have enough for a verdict?[/bold]")
+    console.print()
+    fresh = sum(1 for s in steps if s.fill_pct < LOW_FILL_MAX)
+    deep = sum(1 for s in steps if s.fill_pct >= HIGH_FILL_MIN)
+    window = result.composition.context_window
+
+    def _need(label: str, have: int) -> Text:
+        t = Text()
+        t.append(f"  {label}: ", style="bold")
+        ok = have >= VERDICT_MIN_N
+        t.append(f"{have}", style="green" if ok else "yellow")
+        t.append(f" of ~{VERDICT_MIN_N} needed", style="dim")
+        t.append("  ✓" if ok else "  (keep going)", style="green" if ok else "dim")
+        return t
+
+    console.print(f"  Analyzed: [bold]{len(sessions)}[/bold] sessions, "
+                  f"[bold]{len(steps)}[/bold] steps"
+                  + (f", last {days} days" if days else ", all history")
+                  + f" ({skipped} sessions too short to read)")
+    console.print(f"  Context window in use: [bold]{window:,}[/bold] tokens "
+                  f"(fresh = under {LOW_FILL_MAX:.0f}% full, "
+                  f"deep = over {HIGH_FILL_MIN:.0f}% full)")
+    console.print(_need("Fresh-context steps", fresh))
+    console.print(_need("Deep-context steps", deep))
+    console.print()
+    console.print(f"  Verdict now: [bold]{result.verdict_kind}[/bold] — {result.verdict_text}")
+
+    if result.verdict_kind == "insufficient":
+        console.print()
+        if days:
+            console.print(
+                "  [yellow]Most likely fix:[/yellow] widen the window — "
+                "[cyan]contextrot --days 90[/cyan] (or [cyan]--days 0[/cyan] for all history)."
+            )
+        if deep < VERDICT_MIN_N and fresh >= VERDICT_MIN_N:
+            console.print(
+                f"  Your sessions rarely fill the window (deep starts at "
+                f"{int(HIGH_FILL_MIN / 100 * window):,} tokens). That's healthy — "
+                "there just isn't a deep zone to compare against yet."
+            )
+
+    console.print()
+    console.rule("[bold]Live surfaces[/bold]")
+    console.print()
+    cal = load_calibration()
+    if cal is None:
+        console.print("  Calibration: [yellow]none yet[/yellow] — run a plain "
+                      "[cyan]contextrot[/cyan] to create it.")
+    else:
+        knee = f"~{cal.knee_pct:.0f}%" if cal.knee_pct is not None else "none"
+        console.print(f"  Calibration: [green]present[/green] "
+                      f"({cal.steps} steps, threshold {knee}) "
+                      f"[dim]{calibration_path()}[/dim]")
+    _report_installed_surfaces()
+    console.print()
+
+
+def _search_hint(agent: str, data_dir: Optional[Path]) -> str:
+    """Where an adapter would have looked when it found nothing."""
+    if data_dir is not None:
+        return f"{data_dir} (from --data-dir)"
+    hints = {
+        "claude-code": "~/.claude/projects",
+        "opencode": "~/.local/share/opencode (or OPENCODE_DATA_DIR)",
+        "codex": "~/.codex/sessions",
+        "gemini-cli": "~/.gemini/tmp, ~/.qwen/tmp",
+        "cline": "VS Code globalStorage (Cline/Roo/Kilo)",
+    }
+    return hints.get(agent, "default location")
+
+
+def _report_installed_surfaces() -> None:
+    """Whether the Claude Code statusline / hook entries are installed."""
+    from contextrot.install import (
+        claude_settings_path,
+        has_hook,
+        is_contextrot_entry,
+        read_settings,
+    )
+
+    path = claude_settings_path()
+    try:
+        settings = read_settings(path)
+    except (OSError, ValueError) as e:
+        console.print(f"  Claude Code settings: [yellow]unreadable[/yellow] ({e})")
+        return
+    if not settings:
+        console.print(f"  Claude Code settings: [dim]none at {path}[/dim]")
+        return
+    statusline = is_contextrot_entry(settings.get("statusLine"))
+    console.print(
+        "  Statusline: "
+        + ("[green]installed[/green]" if statusline else "[dim]not installed[/dim]")
+        + ("" if statusline else " — [cyan]contextrot install statusline --apply[/cyan]")
+    )
+    hooked = has_hook(settings)
+    console.print(
+        "  Warning hook: "
+        + ("[green]installed[/green]" if hooked else "[dim]not installed[/dim]")
+        + ("" if hooked else " — [cyan]contextrot install hook --apply[/cyan]")
+    )
+    console.print(
+        "  [dim]Any terminal / any agent: [/dim][cyan]contextrot status --setup tmux[/cyan]"
+    )
+
+
+@app.command()
+def status(
+    fmt: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Output style: ansi (default), plain, tmux, or json.",
+        ),
+    ] = "ansi",
+    within: Annotated[
+        float,
+        typer.Option(
+            "--within",
+            help="Only report a session touched in the last N minutes (0 = any age).",
+        ),
+    ] = 30.0,
+    setup: Annotated[
+        Optional[str],
+        typer.Option(
+            "--setup",
+            help="Print a copy-paste snippet for tmux, starship, bash, zsh, or fish "
+            "(prints only — writes nothing).",
+        ),
+    ] = None,
+    data_dir: DataDir = None,
+) -> None:
+    """Live context health for whatever agent you're using right now.
+
+    Unlike `statusline` (which Claude Code pushes data into), this *pulls*: it
+    finds the most recently active session across every supported agent and
+    prints one line. That makes it work anywhere a status bar can run a command
+    — tmux, Starship, a shell prompt, Waybar — with Codex, Gemini CLI, OpenCode,
+    Cline, or Claude Code alike.
+
+    Run `contextrot status --setup tmux` for a ready-made snippet.
+    """
+    if setup:
+        key = setup.strip().lower()
+        snippet = _SETUP_SNIPPETS.get(key)
+        if snippet is None:
+            console.print(
+                f"[yellow]Unknown target '{setup}'.[/yellow] Choose one of: "
+                + ", ".join(sorted(_SETUP_SNIPPETS))
+            )
+            raise typer.Exit(code=1)
+        console.print(snippet, markup=False, highlight=False)
+        return
+
+    if fmt not in ("ansi", "plain", "tmux", "json"):
+        console.print(
+            f"[yellow]Unknown format '{fmt}'.[/yellow] Choose one of: ansi, plain, tmux, json"
+        )
+        raise typer.Exit(code=1)
+
+    from contextrot.calibration import load_calibration
+    from contextrot.live import detect_live_session
+    from contextrot.statusline import PALETTES, render_fill
+
+    session = detect_live_session(
+        data_dir=data_dir, within_minutes=within if within > 0 else None
+    )
+    if session is None:
+        # Print nothing: a status bar should stay empty rather than show noise.
+        if fmt == "json":
+            print(json.dumps({"live": False}))
+        return
+
+    cal = load_calibration()
+    if fmt == "json":
+        knee = cal.knee_pct if cal is not None and cal.calibrated else None
+        rate = cal.rate_at_fill(session.fill_pct) if cal is not None else None
+        print(
+            json.dumps(
+                {
+                    "live": True,
+                    "agent": session.source,
+                    "fill_pct": round(session.fill_pct, 1),
+                    "model": session.model,
+                    "knee_pct": knee,
+                    "past_knee": knee is not None and session.fill_pct >= knee,
+                    "failure_rate_here": round(rate, 4) if rate is not None else None,
+                    "age_seconds": round(session.age_seconds),
+                }
+            )
+        )
+        return
+
+    # Plain print: status bars display raw bytes, and rich would mangle markup.
+    print(render_fill(session.fill_pct, cal, PALETTES[fmt]))
 
 
 @app.command()

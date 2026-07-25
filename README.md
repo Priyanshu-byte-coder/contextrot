@@ -67,10 +67,12 @@ One command reads the session logs your coding agent already saved and tells you
 | Know what to actually change | `contextrot fix` | plain fixes + a list of MCP servers you set up but never use (preview only, changes nothing) |
 | Check whether you're improving | `contextrot trends` | week-over-week failure rate and startup-bloat trend |
 | Put a status badge in your README | `contextrot badge` | a local SVG verdict badge — no badge service sees your data |
+| See your context health right now | `contextrot status` | one live line for tmux, Starship, or your shell prompt — works with **any** agent |
+| Work out why you have no verdict | `contextrot doctor` | which agents were found, where it looked, and what's still missing |
 
 Use more than one model? A head-to-head model comparison (Opus vs Sonnet vs Haiku, on your workload) shows up in the main report automatically.
 
-**And you can run it live inside Claude Code** — a context-health meter in your status bar, an in-session warning when you cross your own threshold, and a way for Claude Code to check its own rot mid-task. [See below.](#use-it-live-inside-claude-code)
+**And you can watch it live while you work** — in [any terminal with any agent](#live-status-in-any-terminal-any-agent) (tmux, Starship, your shell prompt), plus a [richer native integration for Claude Code](#use-it-live-inside-claude-code) (status bar, in-session warning, and a way for Claude Code to check its own rot mid-task).
 
 ## Why a benchmark can't tell you this
 
@@ -114,12 +116,50 @@ contextrot fix                  # what to change (dry-run; --apply to act, backs
 contextrot trends               # week-over-week: are you improving?
 contextrot badge                # local SVG verdict badge for your README
 contextrot sessions             # list what was parsed
+contextrot doctor               # why don't I have a verdict? what can you see?
+
+# Live status in any terminal, with any agent:
+contextrot status               # one line: current context health
+contextrot status --format tmux # tmux-styled (also: plain, json)
+contextrot status --setup tmux  # print a copy-paste snippet (starship/bash/zsh/fish too)
 
 # Live inside Claude Code (see next section):
 contextrot install statusline   # context-health meter in your status bar
 contextrot install hook         # one in-session warning when you cross your threshold
 contextrot mcp                  # let Claude Code query your rot report mid-session
 ```
+
+## Live status in any terminal (any agent)
+
+Claude Code is the only agent CLI that can *push* live session data into a command
+([Codex](https://github.com/openai/codex/issues/20140) and
+[OpenCode](https://github.com/anomalyco/opencode/issues/30295) have open feature requests for it).
+So for everyone else contextrot *pulls* instead: `contextrot status` finds whichever session is
+currently active — across Claude Code, Codex CLI, Gemini CLI, OpenCode, Cline and friends — and
+prints one line.
+
+```console
+$ contextrot status
+ctx 61% ██████░░░░ · ▲ past your knee (~50%) · fail here 11.2% (2.6× fresh)
+```
+
+That makes it work anywhere a status bar can run a command on a timer. Get a ready-made snippet:
+
+```bash
+contextrot status --setup tmux       # also: starship, bash, zsh, fish
+```
+
+For example, in tmux:
+
+```tmux
+set -g status-interval 5
+set -ag status-right ' #(contextrot status --format tmux) '
+```
+
+`--format` picks the output style: `ansi` (default), `plain` (no escapes), `tmux` (tmux's own
+`#[fg=…]` tags, since tmux doesn't render ANSI), or `json` for Waybar/polybar/scripting. It stays
+silent when no session has been touched recently (`--within`, default 30 minutes), so your bar
+doesn't show a stale number.
 
 ## Use it live inside Claude Code
 
@@ -174,6 +214,11 @@ Agents re-send the entire conversation to the model on *every* step. A 100-step 
 
 **Correlation isn't causation, right?**
 Right, and the report says so on its face. Deep-context steps are also later-in-task steps. contextrot is an observational diagnostic with conservative statistics, not a lab experiment — see [methodology](docs/methodology.md).
+
+**It says "not enough data" — or it can't see the agent I use.**
+Run `contextrot doctor`. It lists every agent it looked for, the exact paths it searched, how many
+steps each contributed, and how many more fresh/deep steps a verdict needs. The most common cause is
+simply a short window — try `contextrot --days 90` (or `--days 0` for all history).
 
 **What about my privacy?**
 contextrot makes **zero network calls**. Local files in, terminal/local HTML out. Grep the codebase for an HTTP client — there isn't one.

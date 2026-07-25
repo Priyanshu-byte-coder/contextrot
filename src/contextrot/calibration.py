@@ -97,6 +97,16 @@ def save_calibration(result: AnalysisResult, path: Path | None = None) -> Path |
         return None
 
 
+def _rate(value: object) -> float:
+    """A stored failure rate, tolerating the null a not-yet-populated zone writes."""
+    if value is None:
+        return 0.0
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def load_calibration(path: Path | None = None) -> Calibration | None:
     """Read the calibration snapshot. None when missing, stale-schema, or unreadable."""
     target = path or calibration_path()
@@ -110,8 +120,12 @@ def load_calibration(path: Path | None = None) -> Calibration | None:
         return Calibration(
             knee_pct=raw.get("knee_pct"),
             verdict_kind=str(raw.get("verdict_kind", "insufficient")),
-            low_fill_rate=float(raw.get("low_fill_rate", 0.0)),
-            high_fill_rate=float(raw.get("high_fill_rate", 0.0)),
+            # Rates are null when a zone has no steps yet (e.g. nothing has run
+            # deep into a 1M-token window). Treat that as 0.0 rather than failing
+            # the whole load — a dead calibration silently kills the statusline
+            # and the hook.
+            low_fill_rate=_rate(raw.get("low_fill_rate")),
+            high_fill_rate=_rate(raw.get("high_fill_rate")),
             steps=int(raw.get("steps", 0)),
             days=raw.get("days"),
             computed_at=str(raw.get("computed_at", "")),
