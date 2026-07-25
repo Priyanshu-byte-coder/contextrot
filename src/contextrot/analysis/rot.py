@@ -66,6 +66,13 @@ class RotCurve:
     ratio_significant: bool  # Wilson CIs of the two zones don't overlap
     knee_pct: int | None  # start of first bucket where rate >= KNEE_RATIO * baseline
     signal_totals: dict[str, int] = field(default_factory=dict)
+    # Where the "fresh" and "deep" zones were actually drawn, and why. With a
+    # 1M-token window a fixed 60% deep zone can be unreachable (agents compact
+    # long before 600k tokens), so the zones fall back to the user's own fill
+    # range — see pick_zones.
+    zone_mode: str = "absolute"  # "absolute" | "adaptive"
+    low_zone_max: float = LOW_FILL_MAX
+    high_zone_min: float = HIGH_FILL_MIN
 
     @property
     def overall_rate(self) -> float:
@@ -123,6 +130,53 @@ VERDICT_MIN_N = 150
 # Ratio below which a significant difference still isn't worth alarming over.
 VERDICT_MIN_RATIO = 1.3
 
+# Adaptive zones: percentiles of the user's own fill distribution, used when the
+# absolute zones don't have enough steps to compare.
+ADAPTIVE_LOW_PCTL = 40
+ADAPTIVE_HIGH_PCTL = 80
+# The two adaptive zones must be this many fill points apart to mean anything —
+# otherwise "fresh" and "deep" describe the same sessions.
+ADAPTIVE_MIN_GAP = 8.0
+
+
+def _percentile(sorted_values: list[float], pctl: float) -> float:
+    if not sorted_values:
+        return 0.0
+    idx = int(pctl / 100.0 * len(sorted_values))
+    return sorted_values[min(len(sorted_values) - 1, max(0, idx))]
+
+
+def pick_zones(fills: list[float]) -> tuple[str, float, float]:
+    """Choose the fresh/deep fill boundaries for this data.
+
+    Fixed boundaries (under 40% / over 60%) are preferred: they mean the same
+    thing for everyone, so verdicts are comparable. But a model with a 1M-token
+    window makes "over 60%" mean over 600k tokens, which most agents never reach
+    because they compact first — leaving the deep zone empty and no verdict
+    possible however long you use the tool.
+
+    So when either fixed zone is too thin, fall back to *this user's* fill range:
+    compare their least-full steps against their most-full ones. Returns
+    (mode, low_zone_max, high_zone_min).
+    """
+    low_n = sum(1 for f in fills if f < LOW_FILL_MAX)
+    high_n = sum(1 for f in fills if f >= HIGH_FILL_MIN)
+    if low_n >= VERDICT_MIN_N and high_n >= VERDICT_MIN_N:
+        return ("absolute", LOW_FILL_MAX, HIGH_FILL_MIN)
+
+    ordered = sorted(fills)
+    low_max = _percentile(ordered, ADAPTIVE_LOW_PCTL)
+    high_min = _percentile(ordered, ADAPTIVE_HIGH_PCTL)
+    if high_min - low_max < ADAPTIVE_MIN_GAP:
+        # Fill barely varies — there is no deep-vs-fresh contrast to measure.
+        return ("absolute", LOW_FILL_MAX, HIGH_FILL_MIN)
+
+    adaptive_low = sum(1 for f in fills if f <= low_max)
+    adaptive_high = sum(1 for f in fills if f >= high_min)
+    if adaptive_low < VERDICT_MIN_N or adaptive_high < VERDICT_MIN_N:
+        return ("absolute", LOW_FILL_MAX, HIGH_FILL_MIN)
+    return ("adaptive", low_max, high_min)
+
 
 def verdict(curve: RotCurve) -> tuple[str, str]:
     """Plain-language interpretation of the curve.
@@ -165,6 +219,8 @@ def build_rot_curve(steps: list[StepSignals]) -> RotCurve:
     buckets = [Bucket(lo, lo + BUCKET_WIDTH) for lo in range(0, 100, BUCKET_WIDTH)]
     signal_totals = dict.fromkeys(SIGNAL_NAMES, 0)
 
+    zone_mode, low_zone_max, high_zone_min = pick_zones([s.fill_pct for s in steps])
+
     low_n = low_d = high_n = high_d = 0
     total_degraded = 0
 
@@ -180,10 +236,15 @@ def build_rot_curve(steps: list[StepSignals]) -> RotCurve:
                 b.by_signal[name] = b.by_signal.get(name, 0) + 1
                 signal_totals[name] += 1
 
-        if s.fill_pct < LOW_FILL_MAX:
+        # Adaptive zones are inclusive at the low edge (they're percentiles of the
+        # observed data, not open-ended bands), so compare with <= there.
+        in_low = s.fill_pct <= low_zone_max if zone_mode == "adaptive" else (
+            s.fill_pct < low_zone_max
+        )
+        if in_low:
             low_n += 1
             low_d += 1 if s.degraded else 0
-        elif s.fill_pct >= HIGH_FILL_MIN:
+        elif s.fill_pct >= high_zone_min:
             high_n += 1
             high_d += 1 if s.degraded else 0
 
@@ -222,6 +283,9 @@ def build_rot_curve(steps: list[StepSignals]) -> RotCurve:
         ratio_significant=significant,
         knee_pct=knee,
         signal_totals=signal_totals,
+        zone_mode=zone_mode,
+        low_zone_max=low_zone_max,
+        high_zone_min=high_zone_min,
     )
 
 

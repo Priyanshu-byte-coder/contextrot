@@ -627,7 +627,7 @@ def doctor(
     """
     from contextrot.adapters import ADAPTERS
     from contextrot.analysis import analyze, load_sessions
-    from contextrot.analysis.rot import HIGH_FILL_MIN, LOW_FILL_MAX, VERDICT_MIN_N
+    from contextrot.analysis.rot import VERDICT_MIN_N
     from contextrot.calibration import calibration_path, load_calibration
 
     console.print()
@@ -671,8 +671,9 @@ def doctor(
 
     console.rule("[bold]Do you have enough for a verdict?[/bold]")
     console.print()
-    fresh = sum(1 for s in steps if s.fill_pct < LOW_FILL_MAX)
-    deep = sum(1 for s in steps if s.fill_pct >= HIGH_FILL_MIN)
+    curve = result.curve
+    low_max, high_min = curve.low_zone_max, curve.high_zone_min
+    fresh, deep = curve.low_fill_n, curve.high_fill_n
     window = result.composition.context_window
 
     def _need(label: str, have: int) -> Text:
@@ -688,9 +689,14 @@ def doctor(
                   f"[bold]{len(steps)}[/bold] steps"
                   + (f", last {days} days" if days else ", all history")
                   + f" ({skipped} sessions too short to read)")
-    console.print(f"  Context window in use: [bold]{window:,}[/bold] tokens "
-                  f"(fresh = under {LOW_FILL_MAX:.0f}% full, "
-                  f"deep = over {HIGH_FILL_MIN:.0f}% full)")
+    console.print(f"  Context window in use: [bold]{window:,}[/bold] tokens")
+    console.print(
+        f"  Compared: fresh = under [bold]{low_max:.0f}%[/bold] full "
+        f"(~{int(low_max / 100 * window):,} tokens) vs "
+        f"deep = over [bold]{high_min:.0f}%[/bold] (~{int(high_min / 100 * window):,})"
+        + ("  [dim](your own range — you never reach the usual 60%)[/dim]"
+           if curve.zone_mode == "adaptive" else "")
+    )
     console.print(_need("Fresh-context steps", fresh))
     console.print(_need("Deep-context steps", deep))
     console.print()
@@ -705,9 +711,9 @@ def doctor(
             )
         if deep < VERDICT_MIN_N and fresh >= VERDICT_MIN_N:
             console.print(
-                f"  Your sessions rarely fill the window (deep starts at "
-                f"{int(HIGH_FILL_MIN / 100 * window):,} tokens). That's healthy — "
-                "there just isn't a deep zone to compare against yet."
+                f"  Your sessions rarely get full (deep starts at "
+                f"{int(high_min / 100 * window):,} tokens), and your fill barely "
+                "varies — so there's no fuller-vs-emptier contrast to measure yet."
             )
 
     console.print()

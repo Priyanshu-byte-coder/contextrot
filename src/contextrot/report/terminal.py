@@ -139,6 +139,20 @@ _COMPARISON_LEGEND = (
 )
 
 
+def _zone_gloss(curve: RotCurve) -> str:
+    """Say exactly which steps were compared — especially when zones adapted."""
+    if curve.zone_mode == "adaptive":
+        return (
+            f"(compared your emptiest steps — under {curve.low_zone_max:.0f}% full — "
+            f"against your fullest — over {curve.high_zone_min:.0f}%; your sessions "
+            "don't reach the usual 60% mark, so this uses your own range)"
+        )
+    return (
+        "(“fresh” = context nearly empty, early in a session · "
+        "“deep/full” = context nearly full)"
+    )
+
+
 def _headline(result: AnalysisResult) -> Panel:
     curve = result.curve
     color = _VERDICT_COLOR[result.verdict_kind]
@@ -178,12 +192,13 @@ def _headline(result: AnalysisResult) -> Panel:
     lines.append(Text())
 
     if curve.degradation_ratio is not None and curve.low_fill_rate is not None:
+        adaptive = curve.zone_mode == "adaptive"
         t = Text()
         t.append("How often it slips: ", style="bold")
         t.append(f"{curve.high_fill_rate:.1%}", style="bold red")
-        t.append(" with a nearly-full context vs ")
+        t.append(" in your fullest sessions vs " if adaptive else " with a nearly-full context vs ")
         t.append(f"{curve.low_fill_rate:.1%}", style="bold green")
-        t.append(" with a fresh one ")
+        t.append(" in your emptiest " if adaptive else " with a fresh one ")
         ratio = curve.degradation_ratio
         ratio_s = "∞" if ratio == float("inf") else f"{ratio:.1f}×"
         t.append(f"({ratio_s}", style="bold")
@@ -194,13 +209,7 @@ def _headline(result: AnalysisResult) -> Panel:
             style="dim",
         )
         lines.append(t)
-        lines.append(
-            Text(
-                "  (“fresh” = context nearly empty, early in a session · "
-                "“deep/full” = context nearly full)",
-                style="dim",
-            )
-        )
+        lines.append(Text("  " + _zone_gloss(curve), style="dim"))
 
     t = Text()
     t.append("Where it starts slipping: ", style="bold")
