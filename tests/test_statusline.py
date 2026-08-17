@@ -5,6 +5,7 @@ from contextrot.calibration import Calibration
 from contextrot.statusline import (
     DEFAULT_SEGMENTS,
     SEGMENT_NAMES,
+    _fmt_eta,
     parse_segments,
     render_fill,
     render_statusline,
@@ -173,15 +174,41 @@ def test_plan_limits_render_both_windows_as_meters():
     assert "wk ██░░░ 41%" in out
 
 
+def test_eta_formatting_is_exact():
+    """Unit-level, so it can assert exact strings without racing the clock."""
+    assert _fmt_eta(3600 + 12 * 60) == "1h12m"
+    assert _fmt_eta(3600) == "1h00m"
+    assert _fmt_eta(23 * 60) == "23m"
+    assert _fmt_eta(30) == "<1m"
+    # A reset already behind us is stale data, not "any second now".
+    assert _fmt_eta(0) is None
+    assert _fmt_eta(-500) is None
+
+
 def test_plan_limits_show_reset_eta_only_when_high():
-    soon = time.time() + 3600 + 720  # 1h12m
+    # Deliberately not asserting an exact string: the renderer recomputes the
+    # remaining time against time.time(), so any fixed target floors to one
+    # minute less as soon as the clock moves. Shape is what matters here;
+    # test_eta_formatting_is_exact covers the digits.
+    soon = time.time() + 3600 + 720  # ~1h12m
     payload = _payload(
         20,
         rate_limits={"five_hour": {"used_percentage": 82.0, "resets_at": soon}},
     )
     out = _plain(render_statusline(payload, _cal()))
     assert "82%" in out
-    assert "1h12m" in out
+    assert re.search(r"1h1[12]m", out)
+
+
+def test_plan_limits_hide_eta_below_the_warn_threshold():
+    """A quota you are nowhere near does not need a countdown."""
+    payload = _payload(
+        20,
+        rate_limits={"five_hour": {"used_percentage": 40.0, "resets_at": time.time() + 7200}},
+    )
+    out = _plain(render_statusline(payload, _cal()))
+    assert "40%" in out
+    assert not re.search(r"\dh\d\dm", out)
 
 
 def test_plan_limits_absent_for_api_key_users():
