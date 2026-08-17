@@ -4,6 +4,96 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [1.4.0] - 2026-08-17
+
+Statusline release. The line now answers three questions it used to dodge:
+how many tokens am I actually using, how much of my plan is left, and what
+does "no knee" mean.
+
+### Added
+
+- **Absolute token accounting in the status line.** The `tokens` segment shows
+  `68k/200k · 132k left` next to the percentage. Claude Code supplies these
+  directly (`context_window.total_input_tokens`, `context_window_size`); for
+  every other agent `contextrot status` now reads them off the transcript via
+  the new `live.tail_usage()`, and `LiveSession` carries `prompt_tokens`,
+  `window`, and `tokens_left`. They are also in `contextrot status --format
+  json` as `prompt_tokens`, `context_window`, and `tokens_left`.
+- **Subscription rate limits.** A `5h █▏░░░ 24% · wk ██░░░ 41%` pair of meters
+  from Claude Code's `rate_limits`, with time-to-reset once a window passes 70%. This is
+  the *real-time* quota, not an estimate. Claude Code only, Pro/Max only, and
+  absent until the session's first API response — the segment disappears
+  rather than guessing.
+- **`--segments`** on both `statusline` and `status`: pick from `ctx`,
+  `tokens`, `health`, `plan`, `cost`, or `all`. Unknown names fall back to the
+  default instead of erroring, because a status bar is the wrong place to fail
+  a session over a config typo. `cost` (session `$` from Claude Code) is
+  opt-in.
+- **`--legend`** on both commands, explaining every segment — in particular
+  that `slip` is a historical base rate, not a forecast.
+- `Calibration.deepest_reliable_fill()` — the top of the deepest bucket with
+  enough steps to speak for itself.
+
+### Changed
+
+- **The line got quiet.** It was spending its widest segment restating that
+  nothing was wrong. A calibrated, clean curve now renders no health text at
+  all — the green bar is the message, and the slip rate no longer appears on
+  its own (a base rate without a warning beside it is a number without a
+  question). Words show up only when they'd change what you do: `nearing knee`,
+  `▲ past knee`, `deep runs hotter`, `rot measured`, `need deeper sessions`, or
+  the uncalibrated nudge. `contextrot doctor` gained the evidence that used to
+  crowd the bar, including how deep the data actually reaches.
+- **Bars are smooth.** Every meter fills in eighth-cells instead of whole ones,
+  so a 10-cell bar has 80 steps of resolution and glides as the number climbs
+  rather than sitting still for 10% and then lurching.
+- **Rate limits are meters, not just numbers**: `5h █▏░░░ 24% · wk ██░░░ 41%`,
+  each colored green through red, with the `plan` label dropped as redundant.
+- **"no knee in your data" is gone.** It meant "measured, and no degradation
+  threshold exists" — a *result*, and usually good news — but users reasonably
+  took it for missing data or a broken tool. A clean curve now says nothing at
+  all (see above), and `contextrot doctor` reports the full finding along with
+  how deep the data actually reaches: on a 1M-token window most sessions never
+  fill past 80%, so a flat curve there means "flat where you've been", not
+  "flat everywhere".
+- **A missing knee is no longer treated as one state.** A threshold is only
+  declared when a bucket's confidence-interval floor clears the baseline, so a
+  curve can be measurably worse at depth and still have no crossing point.
+  Announcing that as an all-clear would have been wrong. The wording now
+  follows the verdict: `clean` → silence, `edge` → "deep runs hotter",
+  `rot` → "rot measured", otherwise → "need deeper sessions".
+- **`fail here 4.7%` → `slip 4.7% (fresh 3.2%)`.** The old label read as a
+  prediction about the next message. It is the share of past steps at this
+  fill level that hit at least one failure signal, and the baseline is now
+  shown beside it (or as `1.5× fresh` when the level is meaningfully worse).
+- `past your knee (~70%)` → `past knee ~70%`, and a new `nearing knee ~70%`
+  state for the ten points below it, which was previously only a bar color.
+- A non-dict `context_window` no longer discards valid calibration: the line
+  degrades to `ctx —` plus whatever else is real, instead of dropping
+  everything.
+- A rate-limit `resets_at` already in the past no longer renders as `<1m`. That
+  timestamp is stale or bogus, and the old formatter clamped it to "under a
+  minute" — inventing urgency out of bad data.
+
+## [1.3.0] - 2026-08-14
+
+### Fixed
+
+- **Verdicts became permanently "insufficient" on large context windows.**
+  Fixing the 1M-token window bug in 1.2.0 was correct but moved the goalposts:
+  with the deep zone starting at 60% of 1M, reaching it needs 600k-token
+  prompts that real sessions never produce, so both verdict zones could never
+  fill at once and every report said "not enough data" — even with three
+  months of history and `--days 0`. Zones are now **adaptive**: when the
+  absolute 30%/60% split can't populate both sides, contextrot falls back to
+  the 40th and 80th percentiles of the user's *own* fill distribution,
+  provided the two zones stay at least 8 points apart and each still clears
+  the minimum sample size. Reports label which mode produced the verdict, so
+  an adaptive comparison is never passed off as an absolute one.
+- `load_calibration()` silently returned `None` — permanently disabling the
+  statusline and the warning hook — when a fill zone had no steps yet, because
+  `float(None)` raised on the stored null.
+
 ## [1.2.0] - 2026-07-25
 
 ### Fixed

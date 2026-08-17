@@ -57,6 +57,25 @@ class Calibration:
     def calibrated(self) -> bool:
         return self.steps >= MIN_CALIBRATED_STEPS
 
+    def deepest_reliable_fill(self) -> float | None:
+        """Top of the deepest bucket that has enough steps to speak for itself.
+
+        A flat curve means one of two very different things: context fill does
+        not hurt this user, or they never fill the window far enough to find
+        out. Quoting how deep the data actually reaches keeps those apart —
+        with a 1M-token window most sessions never pass 80%.
+        """
+        best: float | None = None
+        for b in self.buckets:
+            if b.get("n", 0) >= MIN_BUCKET_N:
+                try:
+                    hi = float(b.get("hi", 0))
+                except (TypeError, ValueError):
+                    continue
+                if best is None or hi > best:
+                    best = hi
+        return best
+
     def rate_at_fill(self, fill_pct: float) -> float | None:
         """The user's measured failure rate in the bucket containing fill_pct.
 

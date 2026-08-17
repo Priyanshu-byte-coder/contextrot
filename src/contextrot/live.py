@@ -37,6 +37,14 @@ class LiveSession:
     path: Path
     age_seconds: float
     project: str = ""
+    # Absolute context accounting, so a status bar can show 68k/200k rather
+    # than only a percentage. 0 when the transcript didn't reveal them.
+    prompt_tokens: int = 0
+    window: int = 0
+
+    @property
+    def tokens_left(self) -> int:
+        return max(0, self.window - self.prompt_tokens)
 
 
 def _prompt_and_model(entry: dict) -> tuple[int, str, int | None] | None:
@@ -96,6 +104,20 @@ def tail_fill(path: Path, max_bytes: int = TAIL_BYTES) -> float | None:
     Returns None when the file isn't readable or holds no recognizable usage —
     callers fall back to a full adapter parse.
     """
+    usage = tail_usage(path, max_bytes)
+    if usage is None:
+        return None
+    prompt, window, _ = usage
+    return min(100.0, 100.0 * prompt / max(window, 1))
+
+
+def tail_usage(path: Path, max_bytes: int = TAIL_BYTES) -> tuple[int, int, str] | None:
+    """(prompt_tokens, window, model) from the last usage entry of a transcript.
+
+    The absolute numbers, not just the ratio, so a status bar can show
+    ``68k/200k`` and how many tokens are left. Returns None when the file isn't
+    readable or holds no recognizable usage.
+    """
     from contextrot.pricing import context_window_for
 
     try:
@@ -126,8 +148,9 @@ def tail_fill(path: Path, max_bytes: int = TAIL_BYTES) -> float | None:
             nearest_model = nearest_model or _model_of(entry)
             continue
         prompt, model, hint = found
-        window = context_window_for(model or nearest_model, hint)
-        return min(100.0, 100.0 * prompt / max(window, 1))
+        resolved = model or nearest_model
+        window = context_window_for(resolved, hint)
+        return prompt, window, resolved
     return None
 
 
@@ -144,8 +167,12 @@ def _model_of(entry: dict) -> str:
     return ""
 
 
-def _fill_via_adapter(adapter, path: Path, repeats: int = 1) -> tuple[float, str, str] | None:
-    """(fill_pct, model, project) from a full parse — for non-JSONL stores.
+def _fill_via_adapter(
+    adapter, path: Path, repeats: int = 1
+) -> tuple[float, str, str, int, int] | None:
+    """(fill_pct, model, project, prompt_tokens, window) from a full parse.
+
+    For non-JSONL stores whose latest step can't be read off a tail.
 
     Covers OpenCode (SQLite / JSON file storage), Cline, and anything else whose
     latest step can't be read off a tail.
@@ -172,7 +199,7 @@ def _fill_via_adapter(adapter, path: Path, repeats: int = 1) -> tuple[float, str
     step = latest.steps[-1]
     window = context_window_for(step.model, latest.context_window_hint)
     fill = min(100.0, 100.0 * step.prompt_tokens / max(window, 1))
-    return fill, step.model, latest.project
+    return fill, step.model, latest.project, step.prompt_tokens, window
 
 
 def _candidates(data_dir: Path | None) -> list[tuple[float, Path, object, str, int]]:
@@ -218,14 +245,17 @@ def detect_live_session(
         if within_minutes is not None and age > within_minutes * 60:
             # Sorted newest-first, so nothing later can be fresh enough either.
             return None
-        fill = tail_fill(path)
         model = ""
         project = ""
-        if fill is None:
+        usage = tail_usage(path)
+        if usage is not None:
+            prompt_tokens, window, model = usage
+            fill = min(100.0, 100.0 * prompt_tokens / max(window, 1))
+        else:
             parsed = _fill_via_adapter(adapter, path, repeats)
             if parsed is None:
                 continue
-            fill, model, project = parsed
+            fill, model, project, prompt_tokens, window = parsed
         return LiveSession(
             source=source,
             fill_pct=fill,
@@ -233,5 +263,7 @@ def detect_live_session(
             path=path,
             age_seconds=age,
             project=project,
+            prompt_tokens=prompt_tokens,
+            window=window,
         )
     return None

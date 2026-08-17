@@ -10,7 +10,7 @@ import os
 import time
 from pathlib import Path
 
-from contextrot.live import detect_live_session, tail_fill
+from contextrot.live import detect_live_session, tail_fill, tail_usage
 from contextrot.pricing import context_window_for
 
 
@@ -153,3 +153,37 @@ def test_detect_falls_back_to_adapter_parse(tmp_path: Path):
     # 100k of sonnet-4.6's 1M window.
     assert abs(live.fill_pct - 10.0) < 0.5
     assert live.project == "/home/dev/app"
+    # The adapter path must carry absolute counts too, not just the ratio.
+    assert live.prompt_tokens == 100_000
+    assert live.window == 1_000_000
+    assert live.tokens_left == 900_000
+
+
+def test_tail_usage_returns_absolute_counts(tmp_path: Path):
+    p = _claude_transcript(tmp_path, 42, model="claude-opus-4-8")
+    usage = tail_usage(p)
+    assert usage is not None
+    prompt, window, model = usage
+    assert window == context_window_for("claude-opus-4-8")
+    assert prompt == int(0.42 * window)
+    assert model == "claude-opus-4-8"
+
+
+def test_tail_usage_uses_codex_window_hint(tmp_path: Path):
+    """Codex states its own window; that hint wins over the pricing table."""
+    p = _codex_rollout(tmp_path, 50, window=272_000)
+    usage = tail_usage(p)
+    assert usage is not None
+    prompt, window, _ = usage
+    assert window == 272_000
+    assert prompt == 136_000
+
+
+def test_detect_carries_tokens_for_status_bars(tmp_path: Path):
+    _claude_transcript(tmp_path, 36, model="claude-opus-5")
+    live = detect_live_session(data_dir=tmp_path)
+    assert live is not None
+    # Opus 5 is a 1M-token window; a status bar needs the raw numbers.
+    assert live.window == 1_000_000
+    assert live.prompt_tokens == 360_000
+    assert live.tokens_left == 640_000

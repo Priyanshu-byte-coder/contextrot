@@ -724,9 +724,20 @@ def doctor(
         console.print("  Calibration: [yellow]none yet[/yellow] — run a plain "
                       "[cyan]contextrot[/cyan] to create it.")
     else:
-        knee = f"~{cal.knee_pct:.0f}%" if cal.knee_pct is not None else "none"
+        # "threshold none" read as a failure; say which of the two it is. This
+        # is also where the statusline's evidence went when it got trimmed —
+        # here there is room to spell out how deep the data actually reaches.
+        if cal.knee_pct is not None:
+            knee = f"threshold ~{cal.knee_pct:.0f}%"
+        elif cal.verdict_kind == "clean":
+            knee = "no threshold — failure rate stays flat as context fills"
+            deepest = cal.deepest_reliable_fill()
+            if deepest is not None and deepest < 100:
+                knee += f", measured up to {deepest:.0f}% full"
+        else:
+            knee = "no single threshold found"
         console.print(f"  Calibration: [green]present[/green] "
-                      f"({cal.steps} steps, threshold {knee}) "
+                      f"({cal.steps} steps, {knee}) "
                       f"[dim]{calibration_path()}[/dim]")
     _report_installed_surfaces()
     console.print()
@@ -806,6 +817,18 @@ def status(
             "(prints only — writes nothing).",
         ),
     ] = None,
+    segments: Annotated[
+        Optional[str],
+        typer.Option(
+            "--segments",
+            help="Which segments to show, comma-separated: ctx, tokens, health, "
+            "plan, cost (or 'all'). Default: ctx,tokens,health,plan.",
+        ),
+    ] = None,
+    legend: Annotated[
+        bool,
+        typer.Option("--legend", help="Explain what every segment of the line means."),
+    ] = False,
     data_dir: DataDir = None,
 ) -> None:
     """Live context health for whatever agent you're using right now.
@@ -816,8 +839,15 @@ def status(
     — tmux, Starship, a shell prompt, Waybar — with Codex, Gemini CLI, OpenCode,
     Cline, or Claude Code alike.
 
-    Run `contextrot status --setup tmux` for a ready-made snippet.
+    Run `contextrot status --setup tmux` for a ready-made snippet, or
+    `contextrot status --legend` to decode every segment of the line.
     """
+    if legend:
+        from contextrot.statusline import LEGEND
+
+        console.print(LEGEND, markup=False, highlight=False, soft_wrap=True)
+        return
+
     if setup:
         key = setup.strip().lower()
         snippet = _SETUP_SNIPPETS.get(key)
@@ -837,8 +867,11 @@ def status(
         raise typer.Exit(code=1)
 
     from contextrot.calibration import load_calibration
+    from contextrot.statusline import PALETTES, parse_segments, render_fill
+
+    picked = parse_segments(segments)
+
     from contextrot.live import detect_live_session
-    from contextrot.statusline import PALETTES, render_fill
 
     session = detect_live_session(
         data_dir=data_dir, within_minutes=within if within > 0 else None
@@ -860,6 +893,9 @@ def status(
                     "agent": session.source,
                     "fill_pct": round(session.fill_pct, 1),
                     "model": session.model,
+                    "prompt_tokens": session.prompt_tokens or None,
+                    "context_window": session.window or None,
+                    "tokens_left": session.tokens_left if session.window else None,
                     "knee_pct": knee,
                     "past_knee": knee is not None and session.fill_pct >= knee,
                     "failure_rate_here": round(rate, 4) if rate is not None else None,
@@ -870,20 +906,50 @@ def status(
         return
 
     # Plain print: status bars display raw bytes, and rich would mangle markup.
-    print(render_fill(session.fill_pct, cal, PALETTES[fmt]))
+    print(
+        render_fill(
+            session.fill_pct,
+            cal,
+            PALETTES[fmt],
+            tokens=session.prompt_tokens or None,
+            window=session.window or None,
+            segments=picked,
+        )
+    )
 
 
 @app.command()
-def statusline() -> None:
+def statusline(
+    segments: Annotated[
+        Optional[str],
+        typer.Option(
+            "--segments",
+            help="Which segments to show, comma-separated: ctx, tokens, health, "
+            "plan, cost (or 'all'). Default: ctx,tokens,health,plan.",
+        ),
+    ] = None,
+    legend: Annotated[
+        bool,
+        typer.Option("--legend", help="Explain what every segment of the line means."),
+    ] = False,
+) -> None:
     """Render a Claude Code statusline segment (reads session JSON from stdin).
 
     Wire it up with `contextrot install statusline` — Claude Code pipes live
     session JSON to this command and displays what it prints: current context
-    fill, colored against YOUR measured degradation curve, not a generic
-    threshold. Run a plain `contextrot` report now and then to recalibrate.
+    fill and absolute token counts, colored against YOUR measured degradation
+    curve rather than a generic threshold, plus your subscription rate limits
+    when Claude Code reports them.
+
+    Run `contextrot statusline --legend` to decode the line, and a plain
+    `contextrot` report now and then to recalibrate.
     """
     from contextrot.calibration import load_calibration
-    from contextrot.statusline import render_statusline
+    from contextrot.statusline import LEGEND, parse_segments, render_statusline
+
+    if legend:
+        console.print(LEGEND, markup=False, highlight=False, soft_wrap=True)
+        return
 
     raw = sys.stdin.read()
     try:
@@ -894,7 +960,11 @@ def statusline() -> None:
         payload = {}
     # Plain print, not rich: Claude Code displays the raw bytes, and rich
     # soft-wrapping or highlighting would mangle the ANSI segment.
-    print(render_statusline(payload, load_calibration()))
+    print(
+        render_statusline(
+            payload, load_calibration(), segments=parse_segments(segments)
+        )
+    )
 
 
 @app.command()

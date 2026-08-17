@@ -140,13 +140,16 @@ prints one line.
 
 ```console
 $ contextrot status
-ctx 61% ██████░░░░ · ▲ past your knee (~50%) · fail here 11.2% (2.6× fresh)
+ctx 61% ██████░░░░ · 122k/200k · 78k left · ▲ past knee ~50% · slip 11.2% — 2.6× fresh
+# and when nothing is wrong, just:
+ctx 34% ███▍░░░░░░ · 340k/1M · 660k left
 ```
 
 That makes it work anywhere a status bar can run a command on a timer. Get a ready-made snippet:
 
 ```bash
 contextrot status --setup tmux       # also: starship, bash, zsh, fish
+contextrot status --legend           # what every segment of the line means
 ```
 
 For example, in tmux:
@@ -161,6 +164,14 @@ set -ag status-right ' #(contextrot status --format tmux) '
 silent when no session has been touched recently (`--within`, default 30 minutes), so your bar
 doesn't show a stale number.
 
+`--segments` trims the line to what you have room for — `ctx`, `tokens`, `health`, `plan`, `cost`,
+or `all`:
+
+```console
+$ contextrot status --segments ctx,tokens
+ctx 61% ██████░░░░ · 122k/200k · 78k left
+```
+
 ## Use it live inside Claude Code
 
 The report tells you where you degrade *after the fact*. These three put it **in front of you while you're working** — and they're the reason a Claude Code user gets the most out of contextrot. All three are dry-run by default, write only with `--apply`, back up your settings first, and undo cleanly with `contextrot uninstall`.
@@ -174,7 +185,39 @@ contextrot install statusline --apply
 Claude Code's status bar shows your current context fill, colored against your *own* measured curve — not a generic "yellow at 70%":
 
 ```
-ctx 72% ███████░░░ · ▲ past your knee (~70%) · fail here 4.8% (1.5× fresh)
+ctx 72% ███████▊░░ · 144k/200k · 56k left · ▲ past knee ~70% · slip 4.8% — 1.5× fresh · 5h █▏░░░ 24% · wk ██░░░ 41%
+```
+
+Reading left to right: how full the window is, the raw token counts, and then what *your* history
+says about being here — `slip 4.8%` means 4.8% of your past steps at this fill level hit at least
+one failure signal (tool error, failed edit, retry, re-read, self-correction), against 3.2% on a
+fresh context. It's a historical base rate, not a prediction.
+
+`5h █▏░░░ 24%` and `wk ██░░░ 41%` are your Claude.ai subscription rate limits — how much of the
+5-hour and weekly windows you've burned, each with its own meter, plus time-to-reset once either
+passes 70%. Claude Code reports these only for Pro/Max accounts and only after the session's first
+API response; the meters simply disappear otherwise.
+
+Every bar fills in eighth-cells rather than whole ones, so it glides as the number climbs instead of
+sitting still for 10% and then jumping.
+
+**When nothing is wrong, the line says nothing about it.** A clean curve produces no health text at
+all — the green bar is the message:
+
+```
+ctx 34% ███▍░░░░░░ · 340k/1M · 660k left
+```
+
+Words show up only when they'd change what you do: `nearing knee ~70%`, `▲ past knee ~70%`,
+`deep runs hotter`, `rot measured`, or `need deeper sessions`. For the full picture — including how
+deep your data actually reaches, which matters on a 1M-token window you never fill past 80% — run
+`contextrot doctor`.
+
+Two knobs:
+
+```bash
+contextrot statusline --legend                        # decode every segment
+contextrot statusline --segments ctx,tokens,health    # trim it; add 'cost' for $/session
 ```
 
 Other statusline tools show cost and a hardcoded threshold; this one knows where *you* start failing, and every plain `contextrot` run recalibrates it from your latest sessions.
