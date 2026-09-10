@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from contextrot.calibration import Calibration
+from contextrot.calibration import Calibration, CalibrationSet
 from contextrot.hook import evaluate, tail_fill_pct
 
 
@@ -12,7 +12,7 @@ def _isolated_state(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("CONTEXTROT_HOOK_STATE", str(tmp_path / "state"))
 
 
-def _cal(knee=70.0, steps: int = 5000) -> Calibration:
+def _curve(knee=70.0, steps: int = 5000) -> Calibration:
     return Calibration(
         knee_pct=knee,
         verdict_kind="edge",
@@ -25,6 +25,15 @@ def _cal(knee=70.0, steps: int = 5000) -> Calibration:
             {"lo": 0, "hi": 70, "n": 800, "rate": 0.033},
             {"lo": 70, "hi": 100, "n": 400, "rate": 0.066},
         ],
+    )
+
+
+def _cal(knee=70.0, steps: int = 5000) -> CalibrationSet:
+    """A set with only a global curve — the single-agent, single-model case."""
+    return CalibrationSet(
+        computed_at="2026-07-12T00:00:00+00:00",
+        days=30,
+        global_curve=_curve(knee=knee, steps=steps),
     )
 
 

@@ -719,26 +719,14 @@ def doctor(
     console.print()
     console.rule("[bold]Live surfaces[/bold]")
     console.print()
-    cal = load_calibration()
-    if cal is None:
+    cal_set = load_calibration()
+    if cal_set is None:
         console.print("  Calibration: [yellow]none yet[/yellow] — run a plain "
                       "[cyan]contextrot[/cyan] to create it.")
     else:
-        # "threshold none" read as a failure; say which of the two it is. This
-        # is also where the statusline's evidence went when it got trimmed —
-        # here there is room to spell out how deep the data actually reaches.
-        if cal.knee_pct is not None:
-            knee = f"threshold ~{cal.knee_pct:.0f}%"
-        elif cal.verdict_kind == "clean":
-            knee = "no threshold — failure rate stays flat as context fills"
-            deepest = cal.deepest_reliable_fill()
-            if deepest is not None and deepest < 100:
-                knee += f", measured up to {deepest:.0f}% full"
-        else:
-            knee = "no single threshold found"
         console.print(f"  Calibration: [green]present[/green] "
-                      f"({cal.steps} steps, {knee}) "
                       f"[dim]{calibration_path()}[/dim]")
+        _report_scopes(cal_set)
     _report_installed_surfaces()
     console.print()
 
@@ -755,6 +743,68 @@ def _search_hint(agent: str, data_dir: Optional[Path]) -> str:
         "cline": "VS Code globalStorage (Cline/Roo/Kilo)",
     }
     return hints.get(agent, "default location")
+
+
+def _threshold_cell(cal) -> str:
+    """The threshold, in as few characters as carry the meaning.
+
+    "none" and "unclear" are different answers: the first means the curve was
+    measured and stays flat, the second that something is off but no single
+    crossing point cleared the confidence floor.
+    """
+    if cal.knee_pct is not None:
+        return f"~{cal.knee_pct:.0f}%"
+    return "none" if cal.verdict_kind == "clean" else "unclear"
+
+
+def _report_scopes(cal_set) -> None:
+    """Every curve the live surfaces can resolve to, narrowest first.
+
+    A table rather than a sentence per row: thresholds are measured per agent
+    and per model because they genuinely differ, and seeing them side by side
+    is the point — it is what makes it obvious the statusline is not quoting
+    somebody else's number at you.
+    """
+    from contextrot.calibration import MIN_CALIBRATED_STEPS
+
+    rows = sorted(
+        cal_set.scopes.values(),
+        key=lambda c: (c.scope_kind != "agent+model", c.scope_kind != "model", -c.steps),
+    )
+    rows.append(cal_set.global_curve)
+
+    table = Table(box=None, pad_edge=False, padding=(0, 2, 0, 0))
+    table.add_column("  Measured curve", style="cyan", no_wrap=True)
+    table.add_column("Steps", justify="right")
+    table.add_column("Threshold")
+    table.add_column("Measured to", justify="right")
+    table.add_column("")
+
+    for curve in rows:
+        thin = curve.steps < MIN_CALIBRATED_STEPS
+        deepest = curve.deepest_reliable_fill()
+        depth = f"{deepest:.0f}% full" if deepest is not None and deepest < 100 else "—"
+        if thin:
+            note = "too few steps to quote"
+        elif curve.blended_axis:
+            note = f"blends {curve.blend_note}"
+        else:
+            note = ""
+        style = "dim" if thin else ""
+        table.add_row(
+            f"  {curve.scope_label}",
+            f"{curve.steps:,}",
+            _threshold_cell(curve),
+            depth,
+            f"[dim]{note}[/dim]" if note else "",
+            style=style,
+        )
+    console.print(table)
+    if cal_set.scopes:
+        console.print(
+            "  [dim]Live surfaces use the narrowest of these that fits your "
+            "current session.[/dim]"
+        )
 
 
 def _report_installed_surfaces() -> None:
@@ -882,7 +932,14 @@ def status(
             print(json.dumps({"live": False}))
         return
 
-    cal = load_calibration()
+    # Resolve the curve for THIS agent and model, not the blended one: a knee
+    # measured on another agent's sessions describes another agent.
+    cal_set = load_calibration()
+    cal = (
+        cal_set.resolve(agent=session.source, model=session.model)
+        if cal_set is not None
+        else None
+    )
     if fmt == "json":
         knee = cal.knee_pct if cal is not None and cal.calibrated else None
         rate = cal.rate_at_fill(session.fill_pct) if cal is not None else None
@@ -899,6 +956,9 @@ def status(
                     "knee_pct": knee,
                     "past_knee": knee is not None and session.fill_pct >= knee,
                     "failure_rate_here": round(rate, 4) if rate is not None else None,
+                    "scope": cal.scope_kind if cal is not None else None,
+                    "scope_label": cal.scope_label if cal is not None else None,
+                    "scope_is_fallback": cal.is_fallback if cal is not None else None,
                     "age_seconds": round(session.age_seconds),
                 }
             )
@@ -960,11 +1020,17 @@ def statusline(
         payload = {}
     # Plain print, not rich: Claude Code displays the raw bytes, and rich
     # soft-wrapping or highlighting would mangle the ANSI segment.
-    print(
-        render_statusline(
-            payload, load_calibration(), segments=parse_segments(segments)
-        )
+    # The statusline only ever runs inside Claude Code, and the payload names
+    # the live model — enough to resolve this session's own curve.
+    cal_set = load_calibration()
+    model = payload.get("model")
+    model_id = model.get("id", "") if isinstance(model, dict) else ""
+    cal = (
+        cal_set.resolve(agent="claude-code", model=str(model_id))
+        if cal_set is not None
+        else None
     )
+    print(render_statusline(payload, cal, segments=parse_segments(segments)))
 
 
 @app.command()

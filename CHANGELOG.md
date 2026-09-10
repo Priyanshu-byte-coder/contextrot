@@ -4,6 +4,65 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [1.5.0] - 2026-09-11
+
+### Fixed
+
+- **A degradation threshold measured on one agent was shown on another.**
+  Calibration stored a single curve blended across every agent, model and
+  project, and every live surface read that one number. If your OpenCode
+  sessions degraded at 60% fill, Claude Code's statusline told you "knee ~60%"
+  even when Claude Code's own curve had no knee at all. Model mixing was worse:
+  a 200k-window model and a 1M-window model have different curves *and*
+  different denominators, so averaging them described neither.
+
+  The snapshot (schema 2) now stores a curve per agent, per model family and
+  per agent+model pair alongside the global one, and the statusline, the
+  warning hook and `contextrot status` each resolve the scope matching the
+  session in front of them:
+
+      agent+model  ->  model  ->  agent  ->  global
+
+  Every rung must clear `MIN_CALIBRATED_STEPS` on its own, so a thin scope
+  falls through to a broader one instead of quoting a threshold built from
+  noise. A curve that blends over the other axis — one model across several
+  agents, or one agent across several models — still gets quoted, but is
+  labelled `(all agents)` / `(all models)` rather than passed off as yours.
+  With a single-agent, single-model history nothing is labelled, because there
+  the global curve simply *is* your curve.
+
+  The old schema is treated as absent rather than upgraded; this is a cache,
+  and the next `contextrot` run rewrites it.
+
+- **Whole model families were being grouped as "unknown".** `model_family()`
+  recognised only Opus, Sonnet and Haiku, so `claude-fable-5` — a first-class
+  Anthropic model already priced with a 1M window in `pricing.py` — landed in
+  an "unknown" bucket together with every GPT, Qwen and Nemotron step, and a
+  single curve was fitted across all of them. Fable and Mythos now group as
+  Anthropic families, other vendors get their own family key derived from the
+  model id (`gpt-5.6-terra` and `gpt-5.6-sol` share `gpt-5.6`), and "unknown"
+  is reserved for things that are genuinely not a model id, like Claude Code's
+  `<synthetic>` placeholder.
+
+### Added
+
+- `contextrot doctor` lists every measured curve as a table — scope, steps,
+  threshold, and how deep the data actually reaches — so it is visible at a
+  glance which slice the statusline is quoting and which scopes blend.
+- `contextrot status --format json` gained `scope`, `scope_label` and
+  `scope_is_fallback`.
+
+### Changed
+
+- `load_calibration()` returns a `CalibrationSet`; callers pick a curve with
+  `.resolve(agent=..., model=...)`. Live surfaces take a single `Calibration`,
+  so they cannot render a number from the wrong scope by accident.
+- `model_family()` / `model_label()` moved to a dependency-free
+  `contextrot.modelkey`, still importable from `analysis.by_model`. The live
+  surfaces need them on every render, and reaching them through the analysis
+  package pulled in the adapters and the statistics layer — about 16 ms of
+  import time on a path that runs every few seconds.
+
 ## [1.4.0] - 2026-08-17
 
 Statusline release. The line now answers three questions it used to dodge:

@@ -323,13 +323,17 @@ def _health_segments(fill: float, cal: Calibration | None, p: Palette) -> list[s
 
     out: list[str] = []
     knee = cal.knee_pct
+    # A threshold measured on a different mix of agents and models than the one
+    # you are using is a weaker claim, so it never renders as if it were yours.
+    blend = cal.blend_note if cal.is_fallback else ""
+    borrowed = f" {p.dim}({blend}){p.reset}" if blend else ""
     if knee is not None:
         if fill >= knee:
-            out.append(f"{p.red}▲ past knee ~{knee:.0f}%{p.reset}")
+            out.append(f"{p.red}▲ past knee ~{knee:.0f}%{p.reset}{borrowed}")
         elif fill >= knee - 10:
-            out.append(f"{p.yellow}nearing knee ~{knee:.0f}%{p.reset}")
+            out.append(f"{p.yellow}nearing knee ~{knee:.0f}%{p.reset}{borrowed}")
         else:
-            out.append(f"{p.dim}knee ~{knee:.0f}%{p.reset}")
+            out.append(f"{p.dim}knee ~{knee:.0f}%{p.reset}{borrowed}")
     else:
         note = _no_knee_note(cal, p)
         if note:

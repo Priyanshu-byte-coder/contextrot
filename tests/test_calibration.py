@@ -37,8 +37,9 @@ def test_save_load_roundtrip(tmp_path: Path):
     written = save_calibration(result, target)
     assert written == target
 
-    cal = load_calibration(target)
-    assert cal is not None
+    cal_set = load_calibration(target)
+    assert cal_set is not None
+    cal = cal_set.global_curve
     assert cal.steps == len(result.steps)
     assert cal.verdict_kind == result.verdict_kind
     assert cal.knee_pct == result.curve.knee_pct
@@ -53,6 +54,11 @@ def test_load_missing_and_garbage(tmp_path: Path):
     wrong_schema = tmp_path / "old.json"
     wrong_schema.write_text(json.dumps({"schema": 999}), encoding="utf-8")
     assert load_calibration(wrong_schema) is None
+    # Schema 1 files are treated as absent, not upgraded: this is a cache, and
+    # the next report run rewrites it with scoped curves.
+    v1 = tmp_path / "v1.json"
+    v1.write_text(json.dumps({"schema": 1, "knee_pct": 70, "steps": 9999}), encoding="utf-8")
+    assert load_calibration(v1) is None
 
 
 def test_calibrated_threshold():

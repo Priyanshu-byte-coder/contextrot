@@ -21,8 +21,21 @@ from contextrot.signals import StepSignals
         ("claude-haiku-4-5-20251001", "haiku-4.5"),
         ("claude-sonnet-4-5-latest", "sonnet-4.5"),
         ("CLAUDE-OPUS-4-8", "opus-4.8"),
+        # Fable and Mythos are priced with 1M windows in pricing.py; they must
+        # group as Anthropic families too, not fall through to "unknown".
+        ("claude-fable-5", "fable-5"),
+        ("claude-mythos-5", "mythos-5"),
+        # Other vendors get their own family rather than sharing one bucket:
+        # a single curve built from GPT + Qwen + Nemotron describes none of them.
+        ("gpt-4o", "gpt-4"),
+        ("gpt-5.6-terra", "gpt-5.6"),
+        ("gpt-5.6-sol", "gpt-5.6"),
+        ("qwen3.6-plus", "qwen-3.6"),
+        ("nemotron-3.5-lightning-free", "nemotron-3.5"),
+        ("gemini-3-pro", "gemini-3"),
+        # Genuinely not a model id.
         ("", "unknown"),
-        ("gpt-4o", "unknown"),
+        ("<synthetic>", "unknown"),
     ],
 )
 def test_model_family(model_id: str, family: str):

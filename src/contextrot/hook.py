@@ -20,7 +20,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from contextrot.calibration import Calibration
+from contextrot.calibration import CalibrationSet
 
 # Fill must drop this many points below the knee before the warning re-arms.
 REARM_MARGIN = 5.0
@@ -48,15 +48,27 @@ def tail_fill_pct(transcript_path: Path, max_bytes: int = _TAIL_BYTES) -> float 
     return tail_fill(transcript_path, max_bytes)
 
 
-def evaluate(payload: dict, cal: Calibration | None) -> str | None:
+def evaluate(payload: dict, cal_set: CalibrationSet | None) -> str | None:
     """The warning to show, or None. Handles the warn-once marker lifecycle."""
-    if cal is None or not cal.calibrated or cal.knee_pct is None:
+    if cal_set is None:
         return None
     transcript = payload.get("transcript_path")
     if not transcript:
         return None
-    fill = tail_fill_pct(Path(str(transcript)))
-    if fill is None:
+
+    from contextrot.live import tail_usage
+
+    # One tail read gives both the fill and the model, so the threshold this
+    # warns on is the one measured for the model actually running — not a
+    # blend of every model in your history.
+    usage = tail_usage(Path(str(transcript)), _TAIL_BYTES)
+    if usage is None:
+        return None
+    prompt, window, model = usage
+    fill = min(100.0, 100.0 * prompt / max(window, 1))
+
+    cal = cal_set.resolve(agent="claude-code", model=model)
+    if not cal.calibrated or cal.knee_pct is None:
         return None
 
     knee = float(cal.knee_pct)

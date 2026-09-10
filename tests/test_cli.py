@@ -318,15 +318,20 @@ def test_hook_command_emits_system_message(tmp_path: Path):
     cal.write_text(
         _json.dumps(
             {
-                "schema": 1,
+                "schema": 2,
                 "computed_at": "2026-07-12T00:00:00+00:00",
                 "days": 30,
-                "steps": 5000,
-                "verdict_kind": "edge",
-                "knee_pct": 70.0,
-                "low_fill_rate": 0.033,
-                "high_fill_rate": 0.048,
-                "buckets": [{"lo": 70, "hi": 100, "n": 400, "rate": 0.066}],
+                "global": {
+                    "steps": 5000,
+                    "verdict_kind": "edge",
+                    "knee_pct": 70.0,
+                    "low_fill_rate": 0.033,
+                    "high_fill_rate": 0.048,
+                    "buckets": [{"lo": 70, "hi": 100, "n": 400, "rate": 0.066}],
+                    "label": "all agents and models",
+                    "scope_kind": "global",
+                },
+                "scopes": {},
             }
         ),
         encoding="utf-8",
