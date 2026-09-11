@@ -90,6 +90,14 @@ def main(
     project: ProjectF = None,
     days: Days = 30,
     window: Window = None,
+    full: Annotated[
+        bool,
+        typer.Option(
+            "--full",
+            help="The complete analysis: rot curve, snowball table, comparisons, "
+            "context composition. Default is a short summary.",
+        ),
+    ] = False,
     as_json: Annotated[bool, typer.Option("--json", help="Machine-readable output.")] = False,
     html: Annotated[
         Optional[Path], typer.Option("--html", help="Also write a shareable HTML report.")
@@ -217,9 +225,12 @@ def main(
         }
         print(json.dumps(payload, indent=2))
     else:
-        from contextrot.report import render
+        from contextrot.report import render, render_brief
 
-        render(result, console)
+        # Short by default. The full analysis is the right output when you are
+        # investigating, and the wrong one when you just want to know whether
+        # you're fine — the answer used to be four panels down.
+        (render if full else render_brief)(result, console)
 
         # The most common false alarm: a short --days window hides enough
         # history for a verdict. If we came up short but there's likely more

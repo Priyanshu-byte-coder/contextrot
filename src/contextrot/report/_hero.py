@@ -16,6 +16,17 @@ HEADLINE_WORDS = {
     "insufficient": "NOT ENOUGH DATA YET",
 }
 
+# How a verdict is painted. Shared by both terminal renderers so the brief
+# report and the full one can never disagree about what "edge" looks like.
+VERDICT_STYLE = {
+    "rot": "bold red",
+    "edge": "bold yellow",
+    "clean": "bold green",
+    "insufficient": "bold yellow",
+}
+VERDICT_ICON = {"rot": "✗ ", "edge": "! ", "clean": "✓ ", "insufficient": "? "}
+VERDICT_COLOR = {"rot": "red", "edge": "yellow", "clean": "green", "insufficient": "yellow"}
+
 
 def hero_stat(result: AnalysisResult) -> dict:
     """Returns {kind, headline_word, value, label, secondary: [str, ...]}."""

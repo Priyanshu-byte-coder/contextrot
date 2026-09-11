@@ -58,7 +58,8 @@ One command reads the session logs your coding agent already saved and tells you
 
 | You want to… | Run | What you get back |
 |---|---|---|
-| See if your agent degrades — and where | `contextrot` | a plain verdict + the context-fill % where *you* start failing |
+| See if your agent degrades — and where | `contextrot` | a short verdict: what's happening, what it's costing, what to change |
+| Dig into the numbers behind that | `contextrot --full` | the rot curve, per-model/project/agent comparisons, context breakdown |
 | Look further back for tighter numbers | `contextrot --days 90` | the same report over more history |
 | Check just one repo | `contextrot -p myproject` | that project's own curve and verdict |
 | Get a report you can share | `contextrot --html report.html` | one local HTML file + a ready-to-post image card |
@@ -105,7 +106,8 @@ Use more than one coding agent? `contextrot agents` compares them too — Claude
 The [table above](#what-it-does-in-plain-words) explains each of these in plain words; this is the quick lookup.
 
 ```bash
-contextrot                      # full report, last 30 days
+contextrot                      # short verdict, last 30 days
+contextrot --full               # the complete analysis behind it
 contextrot --days 90            # more history = tighter statistics
 contextrot -p myproject         # one project only
 contextrot --html report.html   # shareable single-file report + share card (100% local)

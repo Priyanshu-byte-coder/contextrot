@@ -13,7 +13,12 @@ from rich.table import Table
 from rich.text import Text
 
 from contextrot.analysis import AnalysisResult, RotCurve
-from contextrot.report._hero import hero_stat
+from contextrot.report._hero import (
+    VERDICT_COLOR,
+    VERDICT_ICON,
+    VERDICT_STYLE,
+    hero_stat,
+)
 
 BAR_WIDTH = 40
 _SPARK = "▁▂▃▄▅▆▇█"
@@ -56,7 +61,7 @@ def _hint(text: str) -> Text:
 def render(result: AnalysisResult, console: Console | None = None) -> None:
     console = console or Console()
     curve = result.curve
-    color = _VERDICT_COLOR[result.verdict_kind]
+    color = VERDICT_COLOR[result.verdict_kind]
 
     console.print()
     console.print(_headline(result))
@@ -123,14 +128,6 @@ def render(result: AnalysisResult, console: Console | None = None) -> None:
     )
 
 
-_VERDICT_STYLE = {
-    "rot": "bold red",
-    "edge": "bold yellow",
-    "clean": "bold green",
-    "insufficient": "bold yellow",
-}
-_VERDICT_ICON = {"rot": "✗ ", "edge": "! ", "clean": "✓ ", "insufficient": "? "}
-_VERDICT_COLOR = {"rot": "red", "edge": "yellow", "clean": "green", "insufficient": "yellow"}
 
 _COMPARISON_LEGEND = (
     "Fresh fail = slip rate when the context is nearly empty · Deep fail = when it's nearly "
@@ -155,14 +152,14 @@ def _zone_gloss(curve: RotCurve) -> str:
 
 def _headline(result: AnalysisResult) -> Panel:
     curve = result.curve
-    color = _VERDICT_COLOR[result.verdict_kind]
+    color = VERDICT_COLOR[result.verdict_kind]
     hero = hero_stat(result)
     lines: list[Text] = []
 
     # Verdict word, color-blocked (reverse degrades gracefully under NO_COLOR).
     lines.append(
         Text(
-            f" {_VERDICT_ICON[result.verdict_kind].strip()} {hero['headline_word']} ",
+            f" {VERDICT_ICON[result.verdict_kind].strip()} {hero['headline_word']} ",
             style=f"bold {color} reverse",
         )
     )
@@ -185,8 +182,8 @@ def _headline(result: AnalysisResult) -> Panel:
 
     lines.append(
         Text(
-            _VERDICT_ICON[result.verdict_kind] + result.verdict_text,
-            style=_VERDICT_STYLE[result.verdict_kind],
+            VERDICT_ICON[result.verdict_kind] + result.verdict_text,
+            style=VERDICT_STYLE[result.verdict_kind],
         )
     )
     lines.append(Text())
@@ -348,8 +345,8 @@ def _comparison_table(title: str, why: str, rows: list) -> Table:
             verdict_cell = Text("—", style="dim")
         else:
             verdict_cell = Text(
-                _VERDICT_ICON[item.verdict_kind] + item.verdict_kind,
-                style=_VERDICT_STYLE[item.verdict_kind],
+                VERDICT_ICON[item.verdict_kind] + item.verdict_kind,
+                style=VERDICT_STYLE[item.verdict_kind],
             )
         row_style = "dim" if item.is_other else ""
         table.add_row(

@@ -4,6 +4,42 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [1.6.0] - 2026-09-11
+
+### Changed
+
+- **The default report is now short.** One command used to print a full
+  analysis — a rot curve with confidence intervals, a snowball table, three
+  comparison tables and a context breakdown — which is the right output when
+  you are investigating and the wrong one when you just want to know whether
+  you are fine. The answer was four panels down.
+
+  `contextrot` now answers three questions and stops: am I degrading, what is
+  it costing me, and what should I change. The editorial rule applied to every
+  line is that if it would not change what you do next, it belongs in
+  `--full`. Roughly 16 lines instead of 135.
+
+  Nothing was removed: **`contextrot --full` prints exactly the previous
+  report**, and `--json` is unchanged.
+
+### Added
+
+- **`--full`** on the default command.
+- The short report quotes the share of token value spent on steps that
+  slipped — retries, failed edits and re-reads that produced nothing. It is
+  deliberately a percentage rather than a dollar figure: costs come from API
+  list prices, so on a subscription the absolute number is "what this would
+  have cost on the API" and reads as a bill you never got. The share means the
+  same thing either way, and it is suppressed entirely when the verdict is
+  "not enough data", because a cost share off a handful of steps is exactly
+  the kind of confident noise this tool refuses elsewhere.
+
+### Internal
+
+- Verdict colours, icons and headline words moved to `report/_hero.py`, which
+  already owned "how a verdict is presented", so the two terminal renderers
+  cannot drift on what `edge` looks like.
+
 ## [1.5.0] - 2026-09-11
 
 ### Fixed

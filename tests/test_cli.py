@@ -9,10 +9,22 @@ FIXTURES = Path(__file__).parent / "fixtures"
 runner = CliRunner()
 
 
-def test_default_report_runs():
+def test_default_report_is_the_short_one():
     result = runner.invoke(app, ["--data-dir", str(FIXTURES), "--days", "0"], env={"NO_COLOR": "1"})
     assert result.exit_code == 0
+    assert "What to do" in result.output
+    assert "contextrot --full" in result.output
+    # The full report's section rules must not appear by default.
+    assert "Does your agent get worse" not in result.output
+
+
+def test_full_flag_restores_the_complete_analysis():
+    result = runner.invoke(
+        app, ["--data-dir", str(FIXTURES), "--days", "0", "--full"], env={"NO_COLOR": "1"}
+    )
+    assert result.exit_code == 0
     assert "context rot report" in result.output
+    assert "Where your context goes" in result.output
 
 
 def _tiny_claude_fixture(root: Path) -> None:
