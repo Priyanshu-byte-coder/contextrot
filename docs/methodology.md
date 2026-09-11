@@ -48,9 +48,56 @@ Two summary zones: **fresh** (< 40% fill) and **deep** (≥ 60%). The headline r
 
 The **degradation threshold (knee)** is the start of the first non-low-confidence bucket at ≥ 40% fill whose rate reaches 1.5× the fresh-zone rate. If no bucket qualifies, no knee is reported — a flat curve is a valid result and contextrot will happily tell you your setup shows no measurable rot.
 
+## Zone selection
+
+The fresh/deep split above is the default. On a 1M-token window it can be unreachable — agents
+compact long before 600k tokens, so the deep zone never fills and no verdict is possible. When
+the absolute split cannot populate both zones, contextrot falls back to the **40th and 80th
+percentiles of your own fill distribution**, provided the two zones stay at least 8 points apart
+and each still clears the minimum sample size. Reports label which mode produced the verdict, so
+an adaptive comparison is never presented as an absolute one.
+
+## Scoped curves
+
+A threshold measured on one agent does not describe another, and a 200k-window model and a
+1M-window model have different curves *and* different denominators — averaging them describes
+neither. So curves are computed and cached **per agent, per model family, and per agent+model
+pair**, alongside the blended one.
+
+Live surfaces resolve the narrowest scope that fits the session in front of them:
+
+    agent+model  →  model  →  agent  →  global
+
+Each level must clear the same minimum step count on its own before it is trusted, so a thin
+scope falls through to a broader one rather than quoting a threshold built from noise. A scope
+that blends over the other axis (one model across several agents, or one agent across several
+models) is still quoted — it fixes at least one variable — but is labelled as blended rather
+than presented as the session's own.
+
+Model ids are canonicalised to a family key before grouping (`claude-opus-4-8` → `opus-4.8`,
+`us.anthropic.claude-sonnet-4-6-v1:0` → `sonnet-4.6`). Non-Anthropic vendors get their own keys
+derived from the id, so `gpt-5.6-terra` and `gpt-5.6-sol` group together rather than landing in
+a single "unknown" bucket with every other vendor.
+
+## Turn cost and headroom
+
+A **turn** runs from one user prompt to the next. Its cost is the difference in prompt tokens
+between the step that opens it and the step that opens the following one — everything the agent
+read, ran and wrote in between. Negative differences are dropped rather than clamped: the context
+shrank, which means a compaction or a fresh branch, not a turn that cost negative tokens.
+
+Headroom is remaining tokens divided by the **median** turn cost, with the **90th percentile**
+quoted beside it once headroom is tight. Both are needed: on real data the p90 turn is several
+times the median, so a median-only estimate promises room that one expensive turn erases.
+
+Turns rather than steps on purpose. Per-step growth is dominated by cache replay — a median step
+adds on the order of a thousand tokens — so headroom expressed in steps runs to the hundreds and
+reads as unlimited. Below 50 observed turns no headroom is reported at all; an estimate built on
+noise reads as a promise.
+
 ## Cost figures
 
-Per-step cost uses published API list prices per model (input, output, cache read, cache write). For subscription users this is the *API-equivalent value*, not a bill. "Spend on degraded steps" sums the cost of steps where a failure signal fired — a lower bound on rework cost, since it excludes the follow-up work those failures caused. Unknown models fall back to conservative defaults and are marked estimated.
+Per-step cost uses published API list prices per model (input, output, cache read, cache write). For subscription users this is the *API-equivalent value*, not a bill. "Spend on degraded steps" sums the cost of steps where a failure signal fired — a lower bound on rework cost, since it excludes the follow-up work those failures caused. `contextrot waste` breaks the same figure down by signal; because one step can trip several signals, those rows overlap and deliberately do not sum to the total. Unknown models fall back to conservative defaults and are marked estimated.
 
 ## Composition estimate
 
@@ -64,4 +111,4 @@ Startup overhead is the prompt size of each session's *first* API call (system p
 
 ## Reproducibility
 
-`contextrot --json` emits every per-step signal record and per-bucket statistic, so any number in the report can be recomputed independently.
+`contextrot --json` emits every per-step signal record and per-bucket statistic, so any number in the report can be recomputed independently. `contextrot waste --json` and `contextrot status --format json` do the same for the cost breakdown and the live reading, the latter naming which scope answered.

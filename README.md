@@ -225,6 +225,30 @@ Words show up only when they'd change what you do: `nearing threshold ~70%`, `�
 deep your data actually reaches, which matters on a 1M-token window you never fill past 80% — run
 `contextrot doctor`.
 
+**The threshold it shows is the one for what you're running right now.** Curves are measured and
+stored per agent, per model family, and per agent+model pair — because they genuinely differ. A
+200k-window model and a 1M-window one have different curves *and* different denominators, so a
+blended number describes neither. The live surfaces resolve the narrowest curve that fits your
+session:
+
+```
+agent+model  →  model  →  agent  →  all of it
+```
+
+Each level needs enough steps of its own before it's trusted, so a thin slice falls through to a
+broader one instead of quoting a threshold built from noise. If the answer does come from a broader
+slice, the line says so — `▲ past threshold ~70% (all agents)` — rather than passing it off as
+yours. `contextrot doctor` tables every curve it stored:
+
+```
+  Measured curve           Steps  Threshold  Measured to
+  Claude Code + Opus 5    21,367  none                 —
+  Claude Code + Opus 4.8   3,619  none          60% full
+  Claude Code + Fable 5    2,484  none          40% full
+  Opus 5                  21,378  none                 —  blends all agents
+  all agents and models   28,448  none                 —  blends all agents
+```
+
 Two knobs:
 
 ```bash
@@ -303,6 +327,11 @@ An adapter is one small file with a fixture and a test — [it's the paved first
 - ✅ Adapter wave (0.6.1–0.7.0) — Codex CLI, Gemini CLI, Qwen Code, Cline, Roo Code, Kilo Code + per-agent comparison
 - ✅ Live surfaces (0.8.0–0.10.0) — calibrated Claude Code statusline, threshold-crossing warning hook, MCP server for any agent
 - ✅ `contextrot trends` (0.11.0) — week-over-week before/after measurement for `fix`
+- ✅ 1.0 (1.0.0–1.3.0) — correct 1M-token windows, `contextrot status` for any terminal, `doctor`, adaptive verdict zones
+- ✅ Statusline that earns its width (1.4.0) — absolute token counts, live Claude.ai rate-limit meters, smooth sub-cell bars
+- ✅ Scoped calibration (1.5.0) — a measured threshold per agent, per model and per pair, so one agent's curve is never shown in another's session
+- ✅ Two reports (1.6.0) — a short default that answers the question, `--full` for the whole analysis
+- ✅ Headroom + `contextrot waste` (1.7.0) — what's left in turns rather than tokens, and the share of your spend that produced nothing
 - OpenTelemetry GenAI span ingestion
 - Opt-in, anonymized aggregate stats → the **State of Context Rot** report: real-workload degradation curves across the community (off by default, aggregate-only, documented schema)
 

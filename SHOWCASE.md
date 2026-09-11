@@ -10,9 +10,37 @@
 
 ---
 
-## The report — where does your agent start failing?
+## The answer, in fifteen seconds
 
 `contextrot`
+
+The default report answers three questions and stops: **am I degrading, what is it costing me,
+and what should I change.** Everything else is one flag away.
+
+```
+ ✓ NO MEASURABLE ROT
+
+  Your agent slips 3.3% of the time when the context is nearly full, against
+  4.0% when it's fresh. Filling the window is not what's hurting your output.
+
+  Measured on 28,617 steps from the last 30 days.
+  3.4% of your token spend went to steps that slipped — retries, failed edits
+  and re-reads that produced nothing.
+
+  What to do
+  → Nothing about context fill — your setup is holding up.
+
+  Run contextrot --full for the curve behind this, the comparisons, and where
+  your context goes.
+```
+
+The rule behind every line: if it wouldn't change what you do next, it lives in `--full`.
+
+---
+
+## The full analysis — where exactly does it start failing?
+
+`contextrot --full`
 
 The headline is a plain verdict — **rot**, **edge rot**, **clean**, or **not enough data** —
 followed by the exact context-fill % where you start failing, a failure-rate curve with
@@ -72,6 +100,33 @@ change cleared statistical noise. This is the before/after check for `contextrot
   <img src="assets/showcase/trends.png" alt="Week-over-week trend table showing failure rate improving from 9.9% to 6.1% and startup tokens shrinking" width="820">
 </div>
 
+## What is the rot actually costing you?
+
+`contextrot waste`
+
+Usage trackers can tell you what you spent. None of them can tell you which part was **wasted**,
+because that needs the failure signals: a retry of a call that already errored, an edit that
+missed, a re-read of a file still sitting in context. Those tokens were paid for and bought
+nothing.
+
+```
+  3.4% of your token spend went to steps that slipped
+  1,082 of 28,701 steps over the last 30 days · $248.91 of $7,342.39 at API list prices
+
+  What went wrong                              Steps     Cost
+  Tool calls that errored                        581  $137.99
+  Files re-read that were already in context     337   $71.74
+  Same call repeated after an error              161   $36.04
+  Edits that missed their target                  44    $8.48
+  “actually, let me fix that”                     27    $8.49
+```
+
+One step can trip several of these, so the rows overlap and the output says so rather than
+apportioning a precision that isn't there. `--json` included, labelled with its pricing basis
+(API list prices — on a subscription that's "what this would have cost", not a bill you got).
+
+---
+
 ## What should you actually change?
 
 `contextrot fix`
@@ -110,8 +165,26 @@ undo cleanly with `contextrot uninstall`.
 Your current context fill, colored against your *own* measured curve — not a generic
 "yellow at 70%." It knows where *you* start failing, and recalibrates on every run.
 
+```
+ctx 34% ███▍░░░░░░ · 340k/1M · ~45 turns left
+ctx 85% ████████▌░ · 850k/1M · ~10 turns left, ~2 heavy · ▲ past threshold ~70% · slip 9.2% — 1.9× fresh
+ctx 99% █████████▉ · 198k/200k · no room for another turn
+```
+
+**Headroom in the unit you plan in.** `660k left` is precise and abstract; `~45 turns left` is
+the thing you decide with. It's measured from your own history — the median turn adds a certain
+number of tokens, so what remains divides into roughly that many more turns. Under 12 it goes
+yellow and adds the heavy case, because one wide grep can cost several times a typical turn.
+
+**The threshold is the one for what you're running right now.** Curves are stored per agent, per
+model and per pair, and the line resolves the narrowest that fits your session. When it has to
+borrow from a broader slice it says so — `(all agents)` — rather than passing it off as yours.
+
+**When nothing is wrong, it says nothing.** A clean curve renders no health text at all; the
+green bar is the message.
+
 <div align="center">
-  <img src="assets/showcase/statusline.png" alt="Claude Code statusline showing context fill colored green/yellow/red against the user's measured knee, with the failure ratio" width="900">
+  <img src="assets/showcase/statusline.png" alt="Claude Code statusline showing context fill colored green/yellow/red against the user's measured threshold, with headroom in turns and the failure ratio" width="900">
 </div>
 
 ### A one-time warning the moment you cross your threshold
@@ -119,7 +192,8 @@ Your current context fill, colored against your *own* measured curve — not a g
 `contextrot install hook --apply`
 
 One nudge, the instant a session crosses *your* measured failure threshold — then silence
-until the next crossing. No knee in your data? It says nothing at all.
+until the next crossing. It uses the threshold for the model actually running, not a blend.
+No threshold in your data? It says nothing at all.
 
 <div align="center">
   <img src="assets/showcase/hook.png" alt="Claude Code hook warning that fires once when context crosses the measured degradation threshold" width="820">
@@ -132,6 +206,29 @@ until the next crossing. No knee in your data? It says nothing at all.
 Runs contextrot as an MCP server so Claude Code itself can pull your rot report during a
 session and decide to compact, warn you, or switch models. Still zero network — a local pipe,
 not a socket.
+
+---
+
+## Which curve is the statusline quoting?
+
+`contextrot doctor`
+
+Thresholds differ by agent and by model, so `doctor` tables every curve that was measured and
+stored — and flags the ones that blend across slices you're not currently using.
+
+```
+  Measured curve           Steps  Threshold  Measured to
+  Claude Code + Opus 5    21,367  none                 —
+  Claude Code + Opus 4.8   3,619  none          60% full
+  Claude Code + Fable 5    2,484  none          40% full
+  Opus 5                  21,378  none                 —  blends all agents
+  Claude Code             28,269  none                 —  blends all models
+  all agents and models   28,448  none                 —  blends all agents
+  Live surfaces use the narrowest of these that fits your current session.
+```
+
+It also explains which agents were found, where it looked, and what's still missing when you
+have no verdict yet.
 
 ---
 
