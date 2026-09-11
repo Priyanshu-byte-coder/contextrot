@@ -160,7 +160,7 @@ class ClaudeCodeAdapter(SessionAdapter):
                 tool_calls=calls,
                 assistant_text="\n".join(texts),
             )
-            session.steps.append(step)
+            session.add_step(step)
             if session.started_at is None:
                 session.started_at = ts
             if ts is not None:
@@ -178,6 +178,7 @@ class ClaudeCodeAdapter(SessionAdapter):
         content = message.get("content")
         if isinstance(content, str):
             session.user_message_chars += len(content)
+            session.mark_turn_start()
             return
         if not isinstance(content, list):
             return
@@ -195,3 +196,4 @@ class ClaudeCodeAdapter(SessionAdapter):
                     call.error_text = text[:500]
             elif block.get("type") == "text" and isinstance(block.get("text"), str):
                 session.user_message_chars += len(block["text"])
+                session.mark_turn_start()

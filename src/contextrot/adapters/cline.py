@@ -236,7 +236,7 @@ class ClineAdapter(SessionAdapter):
                 tool_calls=calls,
                 assistant_text=text,
             )
-            session.steps.append(step)
+            session.add_step(step)
             if session.started_at is None:
                 session.started_at = ts
             if ts is not None:

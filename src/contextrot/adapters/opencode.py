@@ -282,7 +282,7 @@ class OpenCodeAdapter(SessionAdapter):
             parts = self._json_parts(message_id)
             if role == "assistant":
                 step = _step_from_message(mdata, parts)
-                session.steps.append(step)
+                session.add_step(step)
                 if session.started_at is None:
                     session.started_at = step.timestamp
                 if step.timestamp is not None:
@@ -291,6 +291,7 @@ class OpenCodeAdapter(SessionAdapter):
                 for part in parts:
                     if part.get("type") == "text" and isinstance(part.get("text"), str):
                         session.user_message_chars += len(part["text"])
+                        session.mark_turn_start()
 
         if not session.steps:
             return None
@@ -366,7 +367,7 @@ class OpenCodeAdapter(SessionAdapter):
             if role == "assistant":
                 parts = self._sqlite_parts(conn, str(message_id))
                 step = _step_from_message(data, parts)
-                session.steps.append(step)
+                session.add_step(step)
                 if session.started_at is None:
                     session.started_at = step.timestamp
                 if step.timestamp is not None:
@@ -375,6 +376,7 @@ class OpenCodeAdapter(SessionAdapter):
                 for part in self._sqlite_parts(conn, str(message_id)):
                     if part.get("type") == "text" and isinstance(part.get("text"), str):
                         session.user_message_chars += len(part["text"])
+                        session.mark_turn_start()
         if not session.steps:
             return None
         session.sidechain_steps = self._sqlite_sidechain(conn, session_id)

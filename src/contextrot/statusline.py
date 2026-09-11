@@ -12,14 +12,15 @@ Two ways in:
 
 Both render the same line, assembled from named segments::
 
-    ctx 34% ███░░░░░░░ · 68k/200k · 132k left · knee ~70% · slip 4.7% (fresh 5.1%)
+    ctx 34% ███░░░░░░░ · 68k/200k · 132k left · threshold ~70% · slip 4.7% (fresh 5.1%)
 
 Segments, in fixed order (pick with ``segments=``):
 
 ``ctx``
     Fill percentage plus the bar, colored against *your* curve.
 ``tokens``
-    Absolute context tokens: used, window size, and how many are left.
+    Absolute context tokens and the window size, plus what's left — in turns
+    once your turn cost is known, in tokens until then.
 ``health``
     What your measured curve says about this fill level — see below.
 ``plan``
@@ -37,7 +38,7 @@ The health segment distinguishes three genuinely different states, because
 conflating them is how a working tool looks broken:
 
 - *no report yet* → "run contextrot to calibrate"
-- *measured, threshold found* → "knee ~70%" / "▲ past knee ~70%"
+- *measured, threshold found* → "threshold ~70%" / "▲ past threshold ~70%"
 - *measured, no threshold exists* → **nothing**
 
 That last case is good news, not missing data: a flat or falling failure curve
@@ -57,7 +58,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
-from contextrot.calibration import Calibration
+from contextrot.calibration import Calibration, TurnCost
 
 _BAR_CELLS = 10
 
@@ -81,6 +82,10 @@ DEFAULT_SEGMENTS = ("ctx", "tokens", "health", "plan")
 PLAN_WARN_PCT = 70.0
 PLAN_CRIT_PCT = 90.0
 
+# Below this many typical turns of headroom, the gap between a typical turn
+# and an expensive one starts to matter, so the heavy count appears too.
+TURNS_TIGHT = 12
+
 LEGEND = """\
 contextrot statusline segments
 
@@ -99,14 +104,30 @@ contextrot statusline segments
                        Bars fill in eighth-cells, so they glide as the number
                        climbs instead of jumping a whole cell at a time.
 
-  68k/200k · 132k left Absolute tokens in the context window, the window size,
-                       and what remains. Input tokens only (fresh + cache
-                       creation + cache reads), matching how fill % is computed.
+  68k/200k             Absolute tokens in the context window and the window
+                       size. Input tokens only (fresh + cache creation + cache
+                       reads), matching how fill % is computed.
 
-  knee ~70%            Your measured degradation threshold: the fill level
-                       where your failure rate rises and stays risen. Shown as
-                       "nearing knee" ten points out, "▲ past knee" once you
-                       cross it.
+  ~45 turns left       What's left, in the unit you plan in. Measured from YOUR
+                       own history: the median user turn adds a certain number
+                       of tokens, so what remains divides into roughly that many
+                       more turns. Turns rather than tokens because "660k left"
+                       is precise and abstract; turns is the thing you decide
+                       with.
+
+                       Goes yellow under 12 turns and red under 4, and once it
+                       is that tight a second number appears — "~8 turns left,
+                       ~2 heavy" — because a single wide grep or a big file read
+                       costs several times a typical turn, and that gap is what
+                       catches people out.
+
+                       Falls back to "132k left" until enough turns have been
+                       measured to say anything honest.
+
+  threshold ~70%       The fill level where your failure rate rises and stays
+                       risen — measured on your own sessions, not a generic
+                       rule. Shown as "nearing threshold" ten points out, and
+                       "▲ past threshold" once you cross it.
 
   (nothing here)       Silence is the good case. When your curve is clean the
                        health segment says nothing at all — the green bar is
@@ -256,15 +277,40 @@ def _zone(fill: float, knee: float | None, p: Palette) -> str:
     return p.green
 
 
-def _tokens_segment(tokens: int | None, window: int | None, p: Palette) -> str | None:
-    """``68k/200k · 132k left`` when both numbers are known."""
+def _tokens_segment(
+    tokens: int | None,
+    window: int | None,
+    p: Palette,
+    turn_cost: TurnCost | None = None,
+) -> str | None:
+    """``68k/200k`` plus what's left, in whatever unit is meaningful.
+
+    Tokens remaining is precise but abstract; turns remaining is the unit
+    people plan in. When the turn cost has been measured this says
+    ``~45 turns left``, and falls back to ``132k left`` when it hasn't.
+    """
     if not tokens or not window or window <= 0:
         return None
     left = max(0, int(window) - int(tokens))
-    return (
-        f"{_fmt_tokens(tokens)}/{_fmt_tokens(window)} · "
-        f"{p.dim}{_fmt_tokens(left)} left{p.reset}"
-    )
+    head = f"{_fmt_tokens(tokens)}/{_fmt_tokens(window)}"
+
+    turns = turn_cost.turns_left(left) if turn_cost is not None else None
+    if turns is None:
+        return f"{head} · {p.dim}{_fmt_tokens(left)} left{p.reset}"
+
+    if turns < 1:
+        # "~0 turns left, ~0 heavy" says the same thing twice and reads like a
+        # rounding artifact. At this point there is one message: stop.
+        return f"{head} · {p.red}no room for another turn{p.reset}"
+
+    tail = f"~{turns} turns left"
+    if turns <= TURNS_TIGHT:
+        heavy = turn_cost.heavy_turns_left(left) if turn_cost is not None else None
+        # Only worth saying when it differs — "~4 turns, ~4 heavy" is noise.
+        if heavy is not None and heavy < turns:
+            tail += f", ~{heavy} heavy"
+    color = p.red if turns <= 3 else p.yellow if turns <= TURNS_TIGHT else p.dim
+    return f"{head} · {color}{tail}{p.reset}"
 
 
 def _slip_note(fill: float, cal: Calibration, p: Palette) -> str | None:
@@ -329,11 +375,11 @@ def _health_segments(fill: float, cal: Calibration | None, p: Palette) -> list[s
     borrowed = f" {p.dim}({blend}){p.reset}" if blend else ""
     if knee is not None:
         if fill >= knee:
-            out.append(f"{p.red}▲ past knee ~{knee:.0f}%{p.reset}{borrowed}")
+            out.append(f"{p.red}▲ past threshold ~{knee:.0f}%{p.reset}{borrowed}")
         elif fill >= knee - 10:
-            out.append(f"{p.yellow}nearing knee ~{knee:.0f}%{p.reset}{borrowed}")
+            out.append(f"{p.yellow}nearing threshold ~{knee:.0f}%{p.reset}{borrowed}")
         else:
-            out.append(f"{p.dim}knee ~{knee:.0f}%{p.reset}{borrowed}")
+            out.append(f"{p.dim}threshold ~{knee:.0f}%{p.reset}{borrowed}")
     else:
         note = _no_knee_note(cal, p)
         if note:
@@ -399,6 +445,7 @@ def render_fill(
     tokens: int | None = None,
     window: int | None = None,
     segments: tuple[str, ...] = DEFAULT_SEGMENTS,
+    turn_cost: TurnCost | None = None,
 ) -> str:
     """The status line for a known context fill. Never raises."""
     try:
@@ -411,6 +458,7 @@ def render_fill(
             window=window,
             limits=None,
             cost=None,
+            turn_cost=turn_cost,
         )
     except Exception:  # noqa: BLE001 — a broken statusline helps nobody
         return "ctx —"
@@ -426,6 +474,7 @@ def _compose(
     window: int | None,
     limits: dict | None,
     cost: object,
+    turn_cost: TurnCost | None = None,
 ) -> str:
     """Assemble the selected segments into one line."""
     calibrated = cal is not None and cal.calibrated
@@ -443,7 +492,7 @@ def _compose(
             color = _zone(fill, knee, p)
             parts.append(f"ctx {color}{fill:.0f}% {_bar(fill)}{p.reset}")
         if "tokens" in segments:
-            seg = _tokens_segment(tokens, window, p)
+            seg = _tokens_segment(tokens, window, p, turn_cost)
             if seg:
                 parts.append(seg)
 
@@ -451,7 +500,7 @@ def _compose(
         if fill_pct is None:
             # No fill to place on the curve, so quote only what stands alone.
             if calibrated and knee is not None:
-                parts.append(f"{p.dim}knee ~{knee:.0f}%{p.reset}")
+                parts.append(f"{p.dim}threshold ~{knee:.0f}%{p.reset}")
             elif not calibrated:
                 parts.append(f"{p.dim}run contextrot to calibrate{p.reset}")
         else:
@@ -475,15 +524,21 @@ def render_statusline(
     cal: Calibration | None,
     *,
     segments: tuple[str, ...] = DEFAULT_SEGMENTS,
+    turn_cost: TurnCost | None = None,
 ) -> str:
     """One printable line from Claude Code's statusline JSON + calibration."""
     try:
-        return _render(payload, cal, segments)
+        return _render(payload, cal, segments, turn_cost)
     except Exception:  # noqa: BLE001 — a broken statusline helps nobody
         return "ctx —"
 
 
-def _render(payload: dict, cal: Calibration | None, segments: tuple[str, ...]) -> str:
+def _render(
+    payload: dict,
+    cal: Calibration | None,
+    segments: tuple[str, ...],
+    turn_cost: TurnCost | None = None,
+) -> str:
     ctx = payload.get("context_window")
     if not isinstance(ctx, dict):
         ctx = {}
@@ -505,4 +560,5 @@ def _render(payload: dict, cal: Calibration | None, segments: tuple[str, ...]) -
         window=int(window) if isinstance(window, (int, float)) else None,
         limits=limits if isinstance(limits, dict) else None,
         cost=cost,
+        turn_cost=turn_cost,
     )

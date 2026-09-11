@@ -227,6 +227,7 @@ class GeminiCliAdapter(SessionAdapter):
         ts = _parse_ts(record.get("timestamp"))
         if mtype == "user":
             session.user_message_chars += len(_part_text(record.get("content")))
+            session.mark_turn_start()
             return
         if mtype != "gemini":
             return
@@ -251,7 +252,7 @@ class GeminiCliAdapter(SessionAdapter):
             tool_calls=calls,
             assistant_text=_part_text(record.get("content")),
         )
-        session.steps.append(step)
+        session.add_step(step)
         if session.started_at is None:
             session.started_at = ts
         if ts is not None:

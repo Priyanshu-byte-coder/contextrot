@@ -199,6 +199,7 @@ class CodexAdapter(SessionAdapter):
                 )
             elif ptype == "user_message" and isinstance(payload.get("message"), str):
                 session.user_message_chars += len(payload["message"])
+                session.mark_turn_start()
             return model
 
         return model
@@ -293,7 +294,7 @@ class CodexAdapter(SessionAdapter):
         )
         pending_calls.clear()
         pending_texts.clear()
-        session.steps.append(step)
+        session.add_step(step)
         if session.started_at is None:
             session.started_at = ts
         if ts is not None:

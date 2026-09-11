@@ -66,6 +66,7 @@ One command reads the session logs your coding agent already saved and tells you
 | Find which of your repos rots first | `contextrot projects` | your projects ranked, worst-degrading first |
 | Find which agent rots first | `contextrot agents` | Claude Code vs Codex vs Gemini vs Cline, ranked on *your* work |
 | Know what to actually change | `contextrot fix` | plain fixes + a list of MCP servers you set up but never use (preview only, changes nothing) |
+| See what your rot actually costs | `contextrot waste` | the share of your token spend that produced nothing, broken down by what went wrong |
 | Check whether you're improving | `contextrot trends` | week-over-week failure rate and startup-bloat trend |
 | Put a status badge in your README | `contextrot badge` | a local SVG verdict badge — no badge service sees your data |
 | See your context health right now | `contextrot status` | one live line for tmux, Starship, or your shell prompt — works with **any** agent |
@@ -112,6 +113,7 @@ contextrot --days 90            # more history = tighter statistics
 contextrot -p myproject         # one project only
 contextrot --html report.html   # shareable single-file report + share card (100% local)
 contextrot --json               # every number, machine-readable
+contextrot waste                # the share of your spend that produced nothing
 contextrot projects             # rank your projects — which repo rots first
 contextrot agents               # rank your coding agents — which CLI rots first
 contextrot fix                  # what to change (dry-run; --apply to act, backs up first)
@@ -142,9 +144,9 @@ prints one line.
 
 ```console
 $ contextrot status
-ctx 61% ██████░░░░ · 122k/200k · 78k left · ▲ past knee ~50% · slip 11.2% — 2.6× fresh
+ctx 61% ██████░░░░ · 122k/200k · ~5 turns left, ~1 heavy · ▲ past threshold ~50% · slip 11.2% — 2.6× fresh
 # and when nothing is wrong, just:
-ctx 34% ███▍░░░░░░ · 340k/1M · 660k left
+ctx 34% ███▍░░░░░░ · 340k/1M · ~45 turns left
 ```
 
 That makes it work anywhere a status bar can run a command on a timer. Get a ready-made snippet:
@@ -171,7 +173,7 @@ or `all`:
 
 ```console
 $ contextrot status --segments ctx,tokens
-ctx 61% ██████░░░░ · 122k/200k · 78k left
+ctx 61% ██████░░░░ · 122k/200k · ~5 turns left
 ```
 
 ## Use it live inside Claude Code
@@ -187,13 +189,21 @@ contextrot install statusline --apply
 Claude Code's status bar shows your current context fill, colored against your *own* measured curve — not a generic "yellow at 70%":
 
 ```
-ctx 72% ███████▊░░ · 144k/200k · 56k left · ▲ past knee ~70% · slip 4.8% — 1.5× fresh · 5h █▏░░░ 24% · wk ██░░░ 41%
+ctx 72% ███████▊░░ · 144k/200k · ~4 turns left · ▲ past threshold ~70% · slip 4.8% — 1.5× fresh · 5h █▏░░░ 24%
 ```
 
-Reading left to right: how full the window is, the raw token counts, and then what *your* history
-says about being here — `slip 4.8%` means 4.8% of your past steps at this fill level hit at least
-one failure signal (tool error, failed edit, retry, re-read, self-correction), against 3.2% on a
-fresh context. It's a historical base rate, not a prediction.
+Reading left to right: how full the window is, the raw token counts, **how much more work fits**,
+and then what *your* history says about being here.
+
+`~4 turns left` is headroom in the unit you plan in. It's measured from your own sessions — the
+median user turn adds a certain number of tokens, so what remains divides into roughly that many
+more turns. Under 12 turns it goes yellow and adds the heavy case (`~4 turns left, ~1 heavy`),
+because one wide grep can cost several times a typical turn. Until enough turns have been measured
+it just says `56k left`.
+
+`slip 4.8%` means 4.8% of your past steps at this fill level hit at least one failure signal (tool
+error, failed edit, retry, re-read, self-correction), against 3.2% on a fresh context. It's a
+historical base rate, not a prediction.
 
 `5h █▏░░░ 24%` and `wk ██░░░ 41%` are your Claude.ai subscription rate limits — how much of the
 5-hour and weekly windows you've burned, each with its own meter, plus time-to-reset once either
@@ -207,10 +217,10 @@ sitting still for 10% and then jumping.
 all — the green bar is the message:
 
 ```
-ctx 34% ███▍░░░░░░ · 340k/1M · 660k left
+ctx 34% ███▍░░░░░░ · 340k/1M · ~45 turns left
 ```
 
-Words show up only when they'd change what you do: `nearing knee ~70%`, `▲ past knee ~70%`,
+Words show up only when they'd change what you do: `nearing threshold ~70%`, `▲ past threshold ~70%`,
 `deep runs hotter`, `rot measured`, or `need deeper sessions`. For the full picture — including how
 deep your data actually reaches, which matters on a 1M-token window you never fill past 80% — run
 `contextrot doctor`.
@@ -291,7 +301,7 @@ An adapter is one small file with a fixture and a test — [it's the paved first
 
 - ✅ `contextrot fix` (0.6.0) — dry-run prescriptions + unused-MCP-server detection, reversible `--apply`
 - ✅ Adapter wave (0.6.1–0.7.0) — Codex CLI, Gemini CLI, Qwen Code, Cline, Roo Code, Kilo Code + per-agent comparison
-- ✅ Live surfaces (0.8.0–0.10.0) — calibrated Claude Code statusline, knee-crossing warning hook, MCP server for any agent
+- ✅ Live surfaces (0.8.0–0.10.0) — calibrated Claude Code statusline, threshold-crossing warning hook, MCP server for any agent
 - ✅ `contextrot trends` (0.11.0) — week-over-week before/after measurement for `fix`
 - OpenTelemetry GenAI span ingestion
 - Opt-in, anonymized aggregate stats → the **State of Context Rot** report: real-workload degradation curves across the community (off by default, aggregate-only, documented schema)

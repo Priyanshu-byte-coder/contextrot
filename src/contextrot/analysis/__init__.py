@@ -11,6 +11,7 @@ from contextrot.analysis.by_model import ModelStats, build_model_comparison
 from contextrot.analysis.by_project import ProjectStats, build_project_comparison
 from contextrot.analysis.by_source import AgentStats, build_agent_comparison
 from contextrot.analysis.composition import Composition, estimate_composition
+from contextrot.analysis.headroom import GrowthStats, turn_growth
 from contextrot.analysis.prescriptions import Prescription, prescribe
 from contextrot.analysis.rot import (
     ReversalCurve,
@@ -41,6 +42,7 @@ class AnalysisResult:
     signal_rates: dict[str, float] = field(default_factory=dict)
     verdict_kind: str = "insufficient"
     verdict_text: str = ""
+    growth: GrowthStats | None = None  # per-turn context growth, for headroom
     models: list[ModelStats] = field(default_factory=list)
     projects: list[ProjectStats] = field(default_factory=list)
     agents: list[AgentStats] = field(default_factory=list)
@@ -157,6 +159,7 @@ def analyze(
         signal_rates=signal_rates,
         verdict_kind=v_kind,
         verdict_text=v_text,
+        growth=turn_growth(sessions),
         models=build_model_comparison(all_steps),
         projects=build_project_comparison(all_steps),
         agents=build_agent_comparison(all_steps),

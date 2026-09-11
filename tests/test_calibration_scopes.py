@@ -151,7 +151,7 @@ def test_claude_code_never_inherits_opencodes_knee(tmp_path: Path):
 
     # And it must not reach the rendered line either.
     line = _plain(render_statusline({"context_window": {"used_percentage": 80}}, cc))
-    assert "knee" not in line
+    assert "threshold" not in line
     assert "60%" not in line
 
 
@@ -260,7 +260,7 @@ def test_borrowed_threshold_is_marked_in_the_line():
     got = cal_set.resolve("gemini-cli", "gemini-3-pro")
     assert got.is_fallback
     line = _plain(render_statusline({"context_window": {"used_percentage": 75}}, got))
-    assert "past knee ~70%" in line
+    assert "past threshold ~70%" in line
     assert "(all agents)" in line
 
 

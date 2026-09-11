@@ -4,6 +4,63 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [1.7.0] - 2026-09-11
+
+### Added
+
+- **Headroom: what's left, in the unit you plan in.** The status line now says
+  `~45 turns left` instead of `660k left`. Tokens remaining is precise and
+  abstract; turns is the thing you actually decide with. It is measured from
+  your own history — the median user turn adds a certain number of tokens, so
+  what remains divides into roughly that many more turns.
+
+  Under 12 turns it goes yellow and adds the heavy case (`~10 turns left,
+  ~2 heavy`), because one wide grep or a big file read costs several times a
+  typical turn and that gap is what catches people out. Under 4 it goes red,
+  and at zero it says `no room for another turn` rather than `~0 turns left,
+  ~0 heavy`, which said the same thing twice.
+
+  Per-*step* growth was tried first and abandoned: the median step adds about a
+  thousand tokens, mostly cache replay, so real headroom rendered as "686 steps
+  left" — technically true and no help to anyone. Turn boundaries now come from
+  the adapters, which already recognised user prompts.
+
+  Falls back to `132k left` until enough turns have been measured to say
+  anything honest.
+
+- **`contextrot waste`** — the share of your token spend that produced nothing,
+  broken down by what went wrong:
+
+      3.4% of your token spend went to steps that slipped
+      1,082 of 28,701 steps over the last 30 days
+
+      What went wrong                              Steps     Cost
+      Tool calls that errored                        581  $137.99
+      Files re-read that were already in context     337   $71.74
+      Same call repeated after an error              161   $36.04
+
+  Usage trackers can tell you what you spent; none of them can tell you which
+  part was wasted, because that needs the failure signals. One step can trip
+  several signals, so the rows overlap and the output says so rather than
+  apportioning a precision that isn't there. `--json` included.
+
+### Changed
+
+- **`--help` is grouped** into Understand / Act on it / Watch it live / Set up
+  & troubleshoot, instead of one flat list of fifteen commands. **No command
+  path changed** — nesting them under sub-commands would have made every
+  command longer to type and required a parallel set of aliases to avoid
+  breaking existing installs, for a benefit that is purely about reading
+  `--help`.
+- **One word for one idea.** The status line said "knee" where the report said
+  "threshold" for the same thing. "Knee" is the correct term of art in curve
+  analysis and opaque everywhere else, so rendered text now says `threshold
+  ~70%`, `nearing threshold`, `▲ past threshold`. The identifier `knee_pct` and
+  the methodology docs keep the technical term.
+- Calibration schema 3: the snapshot carries the measured turn cost so a status
+  bar can convert tokens into turns without re-reading transcripts. Older
+  snapshots are treated as absent and rewritten by the next run, as before.
+
 ## [1.6.0] - 2026-09-11
 
 ### Changed

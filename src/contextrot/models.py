@@ -43,6 +43,11 @@ class Step:
     output_tokens: int = 0
     tool_calls: list[ToolCall] = field(default_factory=list)
     assistant_text: str = ""
+    # First step after a real user prompt. Turn boundaries are what make
+    # "how much more fits" answerable: per-step growth is dominated by cheap
+    # cache replays and reads as unlimited headroom, while per-turn growth is
+    # an order of magnitude larger and is the unit people actually plan in.
+    starts_turn: bool = False
 
     @property
     def prompt_tokens(self) -> int:
@@ -66,6 +71,21 @@ class Session:
     # model_context_window). When present it beats the model-name lookup,
     # but never a user-supplied --window override.
     context_window_hint: int | None = None
+    # Parse-time only: set when a user prompt is seen, consumed by the next
+    # add_step(). Not part of the session's data, just how adapters hand the
+    # boundary across without each reimplementing the bookkeeping.
+    _pending_turn: bool = field(default=False, repr=False, compare=False)
+
+    def mark_turn_start(self) -> None:
+        """A real user prompt arrived; the next step begins a new turn."""
+        self._pending_turn = True
+
+    def add_step(self, step: Step) -> None:
+        """Append a step, tagging it if it opens a turn."""
+        if self._pending_turn:
+            step.starts_turn = True
+            self._pending_turn = False
+        self.steps.append(step)
 
     @property
     def peak_prompt_tokens(self) -> int:

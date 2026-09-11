@@ -254,7 +254,7 @@ def main(
         console.print(f"[green]HTML report written:[/green] {out}")
 
 
-@app.command()
+@app.command(rich_help_panel="Understand")
 def sessions(
     data_dir: DataDir = None,
     project: ProjectF = None,
@@ -290,7 +290,7 @@ def sessions(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Understand")
 def projects(
     data_dir: DataDir = None,
     days: Days = 30,
@@ -343,7 +343,7 @@ def projects(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Understand")
 def agents(
     data_dir: DataDir = None,
     days: Days = 30,
@@ -396,7 +396,7 @@ def agents(
     console.print(table)
 
 
-@app.command()
+@app.command(rich_help_panel="Act on it")
 def badge(
     output: Annotated[
         Optional[Path],
@@ -431,7 +431,107 @@ def badge(
     console.print(f"  Embed: ![context rot]({out.name})", markup=False)
 
 
-@app.command()
+@app.command(rich_help_panel="Understand")
+def waste(
+    data_dir: DataDir = None,
+    project: ProjectF = None,
+    days: Days = 30,
+    window: Window = None,
+    as_json: Annotated[bool, typer.Option("--json", help="Machine-readable output.")] = False,
+) -> None:
+    """How much of your token spend produced nothing.
+
+    Usage trackers can tell you what you spent. None of them can tell you
+    which part of it was wasted, because that needs the failure signals: a
+    retry of a call that already errored, an edit that missed, a re-read of a
+    file still sitting in context. Those tokens were paid for and bought
+    nothing.
+
+    Costs come from API list prices, so on a subscription the dollar figures
+    are "what this would have cost on the API" rather than a bill you received.
+    The shares mean the same thing either way.
+    """
+    from contextrot.signals import SIGNAL_NAMES
+
+    result = analyze(
+        data_dir=data_dir, project_filter=project, days=days, window_override=window
+    )
+    if not result.steps:
+        console.print("[yellow]No sessions found.[/yellow] Try a wider --days.")
+        raise typer.Exit(code=1)
+
+    total = result.total_cost_usd
+    rework = result.rework_cost_usd
+    share = (rework / total) if total > 0 else 0.0
+    slipped = [st for st in result.steps if st.degraded]
+
+    # Per-signal cost. A step can fire several signals, so these overlap and
+    # deliberately do not sum to the total — labelled as such rather than
+    # silently apportioned, which would invent a precision that isn't there.
+    by_signal = {
+        name: sum(st.cost_usd for st in result.steps if getattr(st, name, False))
+        for name in SIGNAL_NAMES
+    }
+
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "version": __version__,
+                    "days": result.days,
+                    "steps": len(result.steps),
+                    "slipped_steps": len(slipped),
+                    "total_usd": round(total, 2),
+                    "wasted_usd": round(rework, 2),
+                    "wasted_share": round(share, 4),
+                    "by_signal_usd": {k: round(v, 2) for k, v in by_signal.items()},
+                    "pricing_basis": "api_list_prices",
+                    "note": "Signals overlap; by_signal does not sum to wasted_usd.",
+                },
+                indent=2,
+            )
+        )
+        return
+
+    console.print()
+    head = Text()
+    head.append(f"  {share:.1%}", style="bold red" if share >= 0.05 else "bold yellow")
+    head.append(" of your token spend went to steps that slipped", style="bold")
+    console.print(head)
+    console.print(
+        f"  [dim]{len(slipped):,} of {len(result.steps):,} steps"
+        + (f" over the last {result.days} days" if result.days else "")
+        + f" · ${rework:,.2f} of ${total:,.2f} at API list prices[/dim]"
+    )
+    console.print()
+
+    table = Table(box=None, pad_edge=False, padding=(0, 2, 0, 0))
+    table.add_column("  What went wrong", style="cyan", no_wrap=True)
+    table.add_column("Steps", justify="right")
+    table.add_column("Cost", justify="right")
+    for name in SIGNAL_NAMES:
+        n = sum(1 for st in result.steps if getattr(st, name, False))
+        if not n:
+            continue
+        table.add_row(f"  {_SIGNAL_BLURB[name]}", f"{n:,}", f"${by_signal[name]:,.2f}")
+    console.print(table)
+    console.print(
+        "  [dim]One step can trip several of these, so the rows overlap and "
+        "don't sum to the total.[/dim]"
+    )
+    console.print()
+
+
+_SIGNAL_BLURB = {
+    "tool_error": "Tool calls that errored",
+    "edit_failure": "Edits that missed their target",
+    "retry": "Same call repeated after an error",
+    "reread": "Files re-read that were already in context",
+    "self_correction": "“actually, let me fix that”",
+}
+
+
+@app.command(rich_help_panel="Understand")
 def trends(
     data_dir: DataDir = None,
     days: Days = 90,
@@ -492,7 +592,7 @@ def trends(
     console.print("[dim]* fewer than 30 steps — too thin to weigh in the trend.[/dim]")
 
 
-@app.command()
+@app.command(rich_help_panel="Act on it")
 def fix(
     data_dir: DataDir = None,
     days: Days = 30,
@@ -623,7 +723,7 @@ end""",
 }
 
 
-@app.command()
+@app.command(rich_help_panel="Set up & troubleshoot")
 def doctor(
     data_dir: DataDir = None,
     days: Days = 30,
@@ -853,7 +953,7 @@ def _report_installed_surfaces() -> None:
     )
 
 
-@app.command()
+@app.command(rich_help_panel="Watch it live")
 def status(
     fmt: Annotated[
         str,
@@ -967,6 +1067,19 @@ def status(
                     "knee_pct": knee,
                     "past_knee": knee is not None and session.fill_pct >= knee,
                     "failure_rate_here": round(rate, 4) if rate is not None else None,
+                    "turns_left": (
+                        cal_set.turn_cost.turns_left(session.tokens_left)
+                        if cal_set is not None and session.window
+                        else None
+                    ),
+                    "heavy_turns_left": (
+                        cal_set.turn_cost.heavy_turns_left(session.tokens_left)
+                        if cal_set is not None and session.window
+                        else None
+                    ),
+                    "median_turn_tokens": (
+                        cal_set.turn_cost.median or None if cal_set is not None else None
+                    ),
                     "scope": cal.scope_kind if cal is not None else None,
                     "scope_label": cal.scope_label if cal is not None else None,
                     "scope_is_fallback": cal.is_fallback if cal is not None else None,
@@ -985,11 +1098,12 @@ def status(
             tokens=session.prompt_tokens or None,
             window=session.window or None,
             segments=picked,
+            turn_cost=cal_set.turn_cost if cal_set is not None else None,
         )
     )
 
 
-@app.command()
+@app.command(rich_help_panel="Watch it live")
 def statusline(
     segments: Annotated[
         Optional[str],
@@ -1041,10 +1155,17 @@ def statusline(
         if cal_set is not None
         else None
     )
-    print(render_statusline(payload, cal, segments=parse_segments(segments)))
+    print(
+        render_statusline(
+            payload,
+            cal,
+            segments=parse_segments(segments),
+            turn_cost=cal_set.turn_cost if cal_set is not None else None,
+        )
+    )
 
 
-@app.command()
+@app.command(rich_help_panel="Watch it live")
 def hook() -> None:
     """Claude Code PostToolUse hook: warn once when a session crosses your knee.
 
@@ -1068,7 +1189,7 @@ def hook() -> None:
         print(json.dumps({"systemMessage": msg}))
 
 
-@app.command()
+@app.command(rich_help_panel="Watch it live")
 def mcp() -> None:
     """Serve contextrot as an MCP stdio server for any MCP-capable agent.
 
@@ -1091,7 +1212,7 @@ InstallSettings = Annotated[
 ]
 
 
-@app.command()
+@app.command(rich_help_panel="Set up & troubleshoot")
 def install(
     target: Annotated[
         str, typer.Argument(help="What to install: 'statusline'.")
@@ -1188,7 +1309,7 @@ def install(
     console.print(f"  Undo: `contextrot uninstall {target} --apply`, or restore the backup.")
 
 
-@app.command()
+@app.command(rich_help_panel="Set up & troubleshoot")
 def uninstall(
     target: Annotated[
         str, typer.Argument(help="What to uninstall: 'statusline'.")

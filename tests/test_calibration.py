@@ -54,11 +54,13 @@ def test_load_missing_and_garbage(tmp_path: Path):
     wrong_schema = tmp_path / "old.json"
     wrong_schema.write_text(json.dumps({"schema": 999}), encoding="utf-8")
     assert load_calibration(wrong_schema) is None
-    # Schema 1 files are treated as absent, not upgraded: this is a cache, and
-    # the next report run rewrites it with scoped curves.
-    v1 = tmp_path / "v1.json"
-    v1.write_text(json.dumps({"schema": 1, "knee_pct": 70, "steps": 9999}), encoding="utf-8")
-    assert load_calibration(v1) is None
+    # Older schemas are treated as absent, not upgraded: this is a cache, and
+    # the next report run rewrites it.
+    for old in (1, 2):
+        stale = tmp_path / f"v{old}.json"
+        body = json.dumps({"schema": old, "knee_pct": 70, "steps": 9999})
+        stale.write_text(body, encoding="utf-8")
+        assert load_calibration(stale) is None
 
 
 def test_calibrated_threshold():

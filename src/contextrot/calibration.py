@@ -44,7 +44,7 @@ from contextrot.modelkey import model_family
 if TYPE_CHECKING:  # pragma: no cover
     from contextrot.analysis import AnalysisResult
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # A calibration built from fewer steps than this is too noisy to color a
 # statusline with; live surfaces fall back to generic thresholds.
@@ -52,6 +52,10 @@ MIN_CALIBRATED_STEPS = 150
 
 # A bucket needs this many steps before its rate is quoted as "your rate".
 MIN_BUCKET_N = 30
+
+# Below this many observed turns, headroom is noise — and a headroom number
+# built on noise reads as a promise. Mirrors analysis.headroom.
+MIN_TURN_SAMPLES = 50
 
 # Scope kinds, most specific first. This is the resolution order.
 SCOPE_ORDER = ("agent+model", "model", "agent", "global")
@@ -153,6 +157,33 @@ class Calibration:
 
 
 @dataclass
+class TurnCost:
+    """What one user turn typically adds to the context, in tokens.
+
+    Cached here so a status bar can turn "tokens left" into "turns left"
+    without re-reading any transcripts.
+    """
+
+    median: int = 0
+    p90: int = 0
+    samples: int = 0
+
+    @property
+    def usable(self) -> bool:
+        return self.samples >= MIN_TURN_SAMPLES and self.median > 0
+
+    def turns_left(self, tokens_left: int) -> int | None:
+        if not self.usable or tokens_left <= 0:
+            return None
+        return int(tokens_left // self.median)
+
+    def heavy_turns_left(self, tokens_left: int) -> int | None:
+        if not self.usable or self.p90 <= 0 or tokens_left <= 0:
+            return None
+        return int(tokens_left // self.p90)
+
+
+@dataclass
 class CalibrationSet:
     """Every scoped curve from the last report run, plus the global one."""
 
@@ -160,6 +191,7 @@ class CalibrationSet:
     days: int | None
     global_curve: Calibration
     scopes: dict = field(default_factory=dict)  # scope key -> Calibration
+    turn_cost: TurnCost = field(default_factory=lambda: TurnCost())
 
     def resolve(self, agent: str = "", model: str = "") -> Calibration:
         """The narrowest trustworthy curve for this agent + model.
@@ -306,6 +338,15 @@ def save_calibration(result: AnalysisResult, path: Path | None = None) -> Path |
             blended_axis="both",
         ),
         "scopes": _scope_payloads(result),
+        "turn_cost": (
+            {
+                "median": result.growth.median,
+                "p90": result.growth.p90,
+                "samples": result.growth.samples,
+            }
+            if result.growth is not None
+            else {}
+        ),
     }
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -377,9 +418,22 @@ def load_calibration(path: Path | None = None) -> CalibrationSet | None:
         if curve is not None:
             scopes[str(key)] = curve
 
+    raw_turn = raw.get("turn_cost")
+    turn_cost = TurnCost()
+    if isinstance(raw_turn, dict):
+        try:
+            turn_cost = TurnCost(
+                median=int(raw_turn.get("median", 0) or 0),
+                p90=int(raw_turn.get("p90", 0) or 0),
+                samples=int(raw_turn.get("samples", 0) or 0),
+            )
+        except (TypeError, ValueError):
+            turn_cost = TurnCost()
+
     return CalibrationSet(
         computed_at=computed_at,
         days=days if isinstance(days, int) else None,
         global_curve=global_curve,
         scopes=scopes,
+        turn_cost=turn_cost,
     )

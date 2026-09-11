@@ -43,28 +43,28 @@ def _payload(used, **extra) -> dict:
     return payload
 
 
-def test_past_knee_marks_and_quotes_personal_rate():
+def test_past_threshold_marks_and_quotes_personal_rate():
     out = _plain(render_statusline(_payload(72), _cal()))
     assert "72%" in out
-    assert "past knee ~70%" in out
+    assert "past threshold ~70%" in out
     # "slip" is labeled as the historical base rate it is, not as a forecast.
     assert "slip 4.8%" in out
     assert "1.5× fresh" in out
 
 
-def test_below_knee_shows_knee_quietly():
+def test_below_threshold_shows_it_quietly():
     out = _plain(render_statusline(_payload(30), _cal()))
     assert "30%" in out
-    assert "knee ~70%" in out
-    assert "past knee" not in out
-    assert "nearing knee" not in out
+    assert "threshold ~70%" in out
+    assert "past threshold" not in out
+    assert "nearing threshold" not in out
     # Below the knee the baseline is spelled out rather than a multiplier.
     assert "(fresh 3.3%)" in out
 
 
-def test_nearing_knee_warns_before_crossing():
+def test_nearing_threshold_warns_before_crossing():
     out = _plain(render_statusline(_payload(64), _cal()))
-    assert "nearing knee ~70%" in out
+    assert "nearing threshold ~70%" in out
 
 
 # --- no-knee wording: the three cases must not be conflated -----------------
@@ -267,7 +267,7 @@ def test_segments_can_trim_the_line():
 def test_null_used_percentage():
     out = _plain(render_statusline(_payload(None), _cal()))
     assert out.startswith("ctx —")
-    assert "knee ~70%" in out
+    assert "threshold ~70%" in out
 
 
 def test_null_used_percentage_calibrated_no_knee():

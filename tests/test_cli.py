@@ -330,7 +330,7 @@ def test_hook_command_emits_system_message(tmp_path: Path):
     cal.write_text(
         _json.dumps(
             {
-                "schema": 2,
+                "schema": 3,
                 "computed_at": "2026-07-12T00:00:00+00:00",
                 "days": 30,
                 "global": {
@@ -478,3 +478,40 @@ def test_badge_subcommand_directory_target(tmp_path: Path):
     )
     assert result.exit_code == 0
     assert (tmp_path / "contextrot-badge.svg").exists()
+
+
+def test_waste_reports_the_share_and_the_breakdown():
+    result = runner.invoke(
+        app, ["waste", "--data-dir", str(FIXTURES), "--days", "0"], env={"NO_COLOR": "1"}
+    )
+    assert result.exit_code == 0
+    assert "token spend went to steps that slipped" in result.output
+    assert "What went wrong" in result.output
+    # Signals overlap, so the caveat must travel with the numbers. Asserting a
+    # short fragment: the full sentence wraps at the runner's terminal width.
+    assert "rows overlap" in result.output
+
+
+def test_waste_json_is_labelled_with_its_pricing_basis():
+    import json as _json
+
+    result = runner.invoke(
+        app,
+        ["waste", "--data-dir", str(FIXTURES), "--days", "0", "--json"],
+        env={"NO_COLOR": "1"},
+    )
+    assert result.exit_code == 0
+    payload = _json.loads(result.output)
+    assert payload["pricing_basis"] == "api_list_prices"
+    assert 0.0 <= payload["wasted_share"] <= 1.0
+    assert payload["slipped_steps"] <= payload["steps"]
+    # Overlapping signals must not be presented as a partition.
+    assert "does not sum" in payload["note"]
+
+
+def test_waste_exits_cleanly_with_no_sessions(tmp_path: Path):
+    result = runner.invoke(
+        app, ["waste", "--data-dir", str(tmp_path), "--days", "0"], env={"NO_COLOR": "1"}
+    )
+    assert result.exit_code == 1
+    assert "No sessions found" in result.output
