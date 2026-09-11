@@ -303,11 +303,13 @@ def _tokens_segment(
         # rounding artifact. At this point there is one message: stop.
         return f"{head} · {p.red}no room for another turn{p.reset}"
 
-    tail = f"~{turns} turns left"
+    tail = f"~{turns} turn{'' if turns == 1 else 's'} left"
     if turns <= TURNS_TIGHT:
         heavy = turn_cost.heavy_turns_left(left) if turn_cost is not None else None
-        # Only worth saying when it differs — "~4 turns, ~4 heavy" is noise.
-        if heavy is not None and heavy < turns:
+        # Only worth saying when it differs and leaves something to say:
+        # "~4 turns, ~4 heavy" repeats, and "~1 turn, ~0 heavy" is just noise
+        # next to a number that already means "nearly out".
+        if heavy is not None and 0 < heavy < turns:
             tail += f", ~{heavy} heavy"
     color = p.red if turns <= 3 else p.yellow if turns <= TURNS_TIGHT else p.dim
     return f"{head} · {color}{tail}{p.reset}"

@@ -4,6 +4,15 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [1.7.1] - 2026-09-11
+
+### Fixed
+
+- Headroom said `~1 turns left`. Now singular.
+- `~1 turn left, ~0 heavy` dropped the trailing zero: next to a number that
+  already means "nearly out", it added nothing. The heavy count now appears
+  only when it is both smaller than the typical count and above zero.
+
 ## [1.7.0] - 2026-09-11
 
 ### Added

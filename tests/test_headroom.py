@@ -130,3 +130,21 @@ def test_statusline_falls_back_to_tokens_when_unmeasured():
 def test_statusline_falls_back_when_turn_cost_absent_entirely():
     out = _line(34.0, 68_000, 200_000, None)
     assert "132k left" in out
+
+
+def test_single_turn_is_singular():
+    tc = TurnCost(median=15_000, p90=70_000, samples=800)
+    out = _line(92.0, 184_000, 200_000, tc)
+    assert "~1 turn left" in out
+    assert "turns" not in out
+    # "~1 turn left, ~0 heavy" adds nothing to a number that already means
+    # "nearly out".
+    assert "heavy" not in out
+
+
+def test_heavy_is_omitted_when_it_matches_the_typical_count():
+    """"~4 turns, ~4 heavy" repeats itself."""
+    tc = TurnCost(median=15_000, p90=15_000, samples=800)
+    out = _line(70.0, 140_000, 200_000, tc)
+    assert "turns left" in out
+    assert "heavy" not in out
