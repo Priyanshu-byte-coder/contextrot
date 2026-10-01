@@ -4,6 +4,93 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [1.8.0] - 2026-10-02
+
+### Added
+
+- **`contextrot water` — how much water your agents drank, with an animation
+  worth watching.** Inference runs in datacenters that evaporate water to stay
+  cool, and the power stations feeding them consume more, so the token counts
+  contextrot already parses convert into litres. The command fills a tank on
+  screen while the number counts up, then shows where the water went, which
+  agents and models drank it, and exactly how the figure was derived.
+
+  The animation is not a progress bar wearing a costume. The surface is tracked
+  in eighths of a row and drawn with vertical block characters, so it moves
+  eight times per row instead of jumping whole cells. Its height per column is
+  two sine waves at incommensurate frequencies travelling in opposite
+  directions, so the crests never realign and the surface never visibly loops.
+  Each landing droplet adds a decaying ripple — a travelling cosine with both a
+  distance and a time envelope — which is what makes a splash read as a splash.
+  Level and number share one ease-out curve, so they stay locked together and
+  decelerate into the final value. The droplet rate tapers as the tank fills, so
+  the scene settles rather than cutting out.
+
+  Degrades on purpose: a terminal that cannot encode the block characters gets
+  ASCII glyphs, and a pipe or a CI log gets one still frame. `--no-animate`
+  skips straight to the numbers, `--seconds` sets the length, `--json` reports
+  the whole breakdown including the cooling and generation halves.
+
+- **`contextrot water --live` — the animation, actually animating.** A
+  continuous droplet-and-pool view of the session you are in right now, for any
+  agent, with its own clock at 20 fps. The pool fills toward the next round
+  volume and splashes over it; the level eases toward real data rather than
+  snapping, so a jump in the number still looks like water arriving. Ctrl-C to
+  stop. Best in a split pane beside your agent.
+
+  It exists because **a status line cannot animate.** Claude Code re-runs the
+  status command when the conversation changes, not on a timer — in practice a
+  couple of times a minute — so a frame-per-redraw loop takes minutes to
+  complete a cycle. Smooth motion needs a process that owns its own clock. The
+  command help and the README both say so rather than leaving it to be
+  discovered.
+
+- **A `water` statusline segment** — `water 681 ml ▁▂█▂▁`, this session's
+  running total, with a droplet falling into a pool beside it. Eight hand-drawn
+  frames (the drop descends through three heights, lands, throws a crown, and
+  the ripples spread and settle) advancing one frame per redraw, driven by a
+  render count rather than the clock: a wall-clock phase would jump an arbitrary
+  distance between event-driven redraws and read as a flicker. Opt in with
+  `--segments ctx,tokens,health,plan,water`.
+
+  Cheap enough to run on every render: the bytes already counted are remembered
+  in a cursor cache, so each render parses only the tail appended since the last
+  one — about a millisecond once warm, against roughly 0.2s to count a 29 MB
+  transcript from cold. The cache is keyed by a fingerprint of the energy
+  constants, so changing a rate invalidates it rather than leaving totals that
+  were computed half under the old constants and half under the new.
+
+- **`contextrot install statusline --segments ...`** — which segments the
+  installed line renders, without hand-editing `settings.json`. Unknown names
+  are rejected here with an exit code, unlike at render time where they are
+  dropped silently: a status line must never fail a session over a typo, but an
+  install that quietly omits the segment you asked for is how people conclude a
+  feature is broken.
+
+- **`scripts/make_showcase_data.py` and `scripts/capture_showcase.py`** — the
+  synthetic corpus SHOWCASE.md is captured from, and the capture itself. The
+  showcase has always promised that every figure in it comes from synthetic data
+  and that no real project name appears; until now that rested on a dataset
+  nobody committed, so none of it could be reproduced or checked. Fixed seed,
+  fixed timestamps, same numbers on any machine.
+
+### Changed
+
+- Water is the one number contextrot estimates rather than measures, and it is
+  labelled that way everywhere it appears — never mixed into a report, never on
+  by default in the status line, and always quoted with its derivation and an
+  honest plus-or-minus-2x. The constants are documented in
+  `docs/methodology.md`, including what biases the estimate **low**:
+  long-context attention is not priced separately, so decode is charged at a
+  context-independent rate. Correcting that needs a constant nobody publishes,
+  so it is recorded as a known floor rather than guessed at.
+
+### Fixed
+
+- `install statusline` rebuilt the settings entry at write time instead of
+  writing the one it had just previewed. The two were identical until the entry
+  took arguments, at which point the preview and the file would have disagreed.
+
 ## [1.7.1] - 2026-09-11
 
 ### Fixed

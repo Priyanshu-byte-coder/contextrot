@@ -343,3 +343,55 @@ def test_stale_reset_timestamp_does_not_invent_urgency():
     out = _plain(render_statusline(payload, _cal()))
     assert "72%" in out
     assert "<1m" not in out
+
+
+# --- the water droplet loop ---------------------------------------------------
+
+
+def test_the_droplet_loop_cycles_and_never_changes_width():
+    from contextrot.statusline import _DROP_CELLS, _DROP_FRAMES, droplet_frame
+
+    seen = [droplet_frame(i) for i in range(len(_DROP_FRAMES) * 2)]
+    # Every frame is the same width, or the rest of the line shifts as it plays.
+    assert {len(f) for f in seen} == {_DROP_CELLS}
+    # It loops: frame N and frame N + len(frames) are the same picture.
+    assert seen[: len(_DROP_FRAMES)] == seen[len(_DROP_FRAMES) :]
+    # And it actually animates rather than sitting still.
+    assert len(set(seen)) == len(_DROP_FRAMES)
+
+
+def test_the_droplet_frame_is_stable_against_junk_indices():
+    from contextrot.statusline import _DROP_FRAMES, droplet_frame
+
+    assert droplet_frame(0) == droplet_frame(len(_DROP_FRAMES))
+    # A negative count should still draw something rather than raise.
+    assert droplet_frame(-1) in _DROP_FRAMES
+
+
+def test_water_segment_animates_off_the_render_count():
+    from contextrot.statusline import PLAIN, _water_segment, droplet_frame
+    from contextrot.water import LiveWater
+
+    first = _water_segment(LiveWater(ml=812.0, frame=1), PLAIN)
+    second = _water_segment(LiveWater(ml=812.0, frame=2), PLAIN)
+    assert first is not None and second is not None
+    # Same volume, different frame: the droplet moved, the number did not.
+    assert "812 ml" in first and "812 ml" in second
+    assert first != second
+    assert droplet_frame(1) in first
+
+
+def test_water_segment_stays_silent_below_a_millilitre():
+    from contextrot.statusline import PLAIN, _water_segment
+    from contextrot.water import LiveWater
+
+    assert _water_segment(None, PLAIN) is None
+    assert _water_segment(LiveWater(ml=0.4, frame=3), PLAIN) is None
+
+
+def test_water_segment_survives_a_junk_payload():
+    """A vanity metric must never be the thing that breaks a status line."""
+    from contextrot.statusline import PLAIN, _water_segment
+
+    assert _water_segment("not a reading", PLAIN) is None
+    assert _water_segment(object(), PLAIN) is None

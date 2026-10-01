@@ -47,16 +47,43 @@ class LiveSession:
         return max(0, self.window - self.prompt_tokens)
 
 
-def _prompt_and_model(entry: dict) -> tuple[int, str, int | None] | None:
-    """(prompt_tokens, model, window_hint) from one transcript line, if it has usage.
+@dataclass(frozen=True)
+class EntryUsage:
+    """Token accounting read off a single transcript line.
 
-    Handles the JSONL shapes that carry token accounting per step:
+    The full four-way split, not just the prompt total: context fill only needs
+    the prompt side, but water and energy estimates have to price decode, fresh
+    prefill and cache replay differently, and both read the same transcripts.
+    """
+
+    input_tokens: int = 0
+    cache_creation_tokens: int = 0
+    cache_read_tokens: int = 0
+    output_tokens: int = 0
+    model: str = ""
+    window_hint: int | None = None
+
+    @property
+    def prompt_tokens(self) -> int:
+        return self.input_tokens + self.cache_creation_tokens + self.cache_read_tokens
+
+    @property
+    def any_tokens(self) -> bool:
+        return self.prompt_tokens > 0 or self.output_tokens > 0
+
+
+def entry_usage(entry: dict) -> EntryUsage | None:
+    """Token usage from one transcript line, or None if it carries none.
+
+    Handles the JSONL shapes that record token accounting per step:
 
     - Claude Code: ``{"type": "assistant", "message": {"model", "usage": {...}}}``
-      where usage splits fresh input from cache reads/creation.
+      where usage already splits fresh input from cache reads and creation.
     - Codex CLI: ``{"type": "event_msg", "payload": {"type": "token_count",
       "info": {"last_token_usage": {...}, "model_context_window": N}}}`` where
-      ``input_tokens`` already *includes* the cached prefix (OpenAI style).
+      ``input_tokens`` already *includes* the cached prefix (OpenAI style), so
+      the split has to be recovered by subtracting the cached count rather than
+      added on top of it.
     """
     etype = entry.get("type")
 
@@ -67,14 +94,14 @@ def _prompt_and_model(entry: dict) -> tuple[int, str, int | None] | None:
         usage = message.get("usage")
         if not isinstance(usage, dict):
             return None
-        prompt = (
-            int(usage.get("input_tokens") or 0)
-            + int(usage.get("cache_creation_input_tokens") or 0)
-            + int(usage.get("cache_read_input_tokens") or 0)
+        found = EntryUsage(
+            input_tokens=_int(usage.get("input_tokens")),
+            cache_creation_tokens=_int(usage.get("cache_creation_input_tokens")),
+            cache_read_tokens=_int(usage.get("cache_read_input_tokens")),
+            output_tokens=_int(usage.get("output_tokens")),
+            model=str(message.get("model") or ""),
         )
-        if prompt <= 0:
-            return None
-        return prompt, str(message.get("model") or ""), None
+        return found if found.any_tokens else None
 
     if etype == "event_msg":
         payload = entry.get("payload")
@@ -86,16 +113,37 @@ def _prompt_and_model(entry: dict) -> tuple[int, str, int | None] | None:
         usage = info.get("last_token_usage") or info.get("total_token_usage")
         if not isinstance(usage, dict):
             return None
-        # input_tokens already includes the cached prefix here, so it *is* the
-        # context size — don't add cached_input_tokens on top of it.
-        prompt = int(usage.get("input_tokens") or 0)
-        if prompt <= 0:
-            return None
+        total_in = _int(usage.get("input_tokens"))
+        cached = min(_int(usage.get("cached_input_tokens")), total_in)
         window = info.get("model_context_window")
-        hint = int(window) if isinstance(window, int) and window > 0 else None
-        return prompt, str(info.get("model") or ""), hint
+        found = EntryUsage(
+            # Fresh prefill is whatever the cached prefix did not cover. Summing
+            # the two back up has to return total_in, or context fill would move
+            # the moment water accounting was added.
+            input_tokens=total_in - cached,
+            cache_read_tokens=cached,
+            output_tokens=_int(usage.get("output_tokens")),
+            model=str(info.get("model") or ""),
+            window_hint=int(window) if isinstance(window, int) and window > 0 else None,
+        )
+        return found if found.any_tokens else None
 
     return None
+
+
+def _int(value: object) -> int:
+    """A non-negative int from whatever the transcript put there."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0
+    return max(0, int(value))
+
+
+def _prompt_and_model(entry: dict) -> tuple[int, str, int | None] | None:
+    """(prompt_tokens, model, window_hint) for the context-fill readers."""
+    usage = entry_usage(entry)
+    if usage is None or usage.prompt_tokens <= 0:
+        return None
+    return usage.prompt_tokens, usage.model, usage.window_hint
 
 
 def tail_fill(path: Path, max_bytes: int = TAIL_BYTES) -> float | None:

@@ -103,6 +103,56 @@ Per-step cost uses published API list prices per model (input, output, cache rea
 
 Startup overhead is the prompt size of each session's *first* API call (system prompt + tool schemas + project instructions — everything loaded before your first word), averaged per session and exact from token accounting. Tool-output and conversation figures use a 4-characters-per-token heuristic and are labeled estimates. With compaction, flow-through figures can exceed the window size; that flow is precisely what fills it.
 
+## Water and energy (the one estimate)
+
+Every other number in this document is measured from your transcripts. The water figure behind `contextrot water` and the `water` statusline segment is not, and it is labelled that way wherever it appears. The token counts feeding it are real; the constants that turn them into litres are published figures with real error bars.
+
+### Tokens to energy
+
+Three rates rather than one, because the three kinds of token cost wildly different amounts of compute:
+
+| Token kind | Wh per 1k | Why |
+|---|---|---|
+| Output (decode) | 0.60 | One full forward pass per token |
+| Fresh input and cache creation (prefill) | 0.12 | The whole prompt in parallel, so far cheaper per token |
+| Cache read (replay) | 0.012 | Recomputes nothing; costs little more than moving the KV tensors |
+
+Collapsing these into one per-token rate is the single biggest way to get this wrong. A coding agent's token total is dominated by cache reads — typically over 90% of it — so pricing them like fresh input overstates the result several times over, and pricing them like nothing understates it.
+
+**The output rate is the well-anchored one.** On these constants a 1,000-token prompt with a 300-token answer comes to 0.24 Wh, which is exactly [Google's published median for a text prompt](https://cloud.google.com/blog/products/infrastructure/measuring-the-environmental-impact-of-ai-inference). Independently, Epoch AI put a typical GPT-4o query at about 0.3 Wh for roughly 500 output tokens — the same 0.6 per 1k. Two different sources, same number.
+
+**Prefill and cache replay are anchored to price**, which is the only external signal available for them: providers charge 20% of the output rate for fresh input and 2% for a cache read (Opus 5: $5.00 / $0.50 / $25.00 per MTok). Price is not cost, but it is a market signal that cost at least loosely tracks. Version 1.8.0 used 10% and 1% — half of each — which put the whole estimate about 2x low, and worst for exactly the long-context agent sessions this tool exists to study.
+
+### Model size
+
+A coarse three-tier multiplier on those rates: frontier (Opus / Fable / GPT-5 / Gemini 3 class) at 1.0, mid at 0.5, small (Haiku / Flash / mini / nano class) at 0.15. Three tiers rather than a curve because "small / mid / frontier" is the honest resolution available from outside a provider; anything finer would be invented. An unrecognised model is assumed mid-sized, not frontier — guessing high would quietly inflate the figure for every model the table does not know.
+
+### Energy to water, in two parts
+
+Water is consumed twice over, and only reporting the first part is how an estimate ends up several times too small:
+
+| Where | mL per Wh | What it is |
+|---|---|---|
+| Datacenter cooling | 1.08 | Evaporated in cooling towers and evaporative loops |
+| Electricity generation | 1.80 | Consumed at the power station that supplied the datacenter |
+| **Total (reported)** | **2.88** | |
+
+The cooling figure is not a free parameter: it is Google's own published pair for a median text prompt — 0.26 mL of water against 0.24 Wh of energy — divided. The same ratio matches their reported fleet water-usage effectiveness of about 1.1 L/kWh, so two independently published numbers agree.
+
+The generation figure is the consumptive water intensity of US grid electricity. Thermoelectric plants evaporate cooling water of their own, and hydro reservoirs evaporate from their surface; wind and solar consume almost none. So this term swings enormously with grid mix — a datacenter on a clean grid sits far below it, one on a hydro-heavy grid far above. It is nonetheless the *larger* of the two terms, which is why quoting cooling alone understates the footprint by nearly 3x.
+
+`contextrot water` prints the total and then the split, so either convention is readable off the same output.
+
+### What biases it low
+
+**Long-context attention is not priced separately.** Generating one output token requires attending over the entire prefix, so decode gets more expensive as context grows — and a single flat per-output-token rate cannot express that. Modelling it properly needs an attention-cost constant that is not published anywhere, so rather than invent one, this is recorded as a known floor: **the figure is biased low, and increasingly so on deep-context sessions.** That is the opposite of the bias you would want from a tool arguing that long contexts are costly, which is why it is stated here rather than buried.
+
+### Uncertainty
+
+Plus or minus 2x, quoted with the number every time. The constants are public medians across whole fleets; a specific datacenter on a specific day, with a specific cooling design and a specific grid mix, sits well either side of them. The figure is useful for *relative* comparison — which agent, which model, which bucket — and for order of magnitude. It is not a utility bill.
+
+The derivation is reproducible: `contextrot water --json` emits the raw token counts, the energy total, the cooling and generation halves, and the split by bucket, agent and model family, so any of it can be recomputed against different constants.
+
 ## What this is not
 
 - **Not causal.** contextrot measures association between context fill and failure signals in observational data. Deep-context steps also tend to be later in harder tasks; some of the association is task difficulty, not rot. The report never claims otherwise.

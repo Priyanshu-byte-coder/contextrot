@@ -515,3 +515,74 @@ def test_waste_exits_cleanly_with_no_sessions(tmp_path: Path):
     )
     assert result.exit_code == 1
     assert "No sessions found" in result.output
+
+
+# --- water -------------------------------------------------------------------
+
+
+def test_water_command_reports_an_estimate_with_its_derivation():
+    result = runner.invoke(
+        app,
+        ["water", "--data-dir", str(FIXTURES), "--days", "0", "--no-animate"],
+        env={"NO_COLOR": "1"},
+    )
+    assert result.exit_code == 0
+    assert "of water" in result.output
+    assert "Where it went" in result.output
+    # The one number contextrot does not measure must never appear without this.
+    assert "Estimate, not a measurement" in result.output
+
+
+def test_water_json_is_flagged_as_estimated():
+    result = runner.invoke(
+        app, ["water", "--data-dir", str(FIXTURES), "--days", "0", "--json"]
+    )
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["estimated"] is True
+    assert data["uncertainty_factor"] == 2.0
+    assert data["water_ml"] > 0
+    assert data["steps"] > 0
+    # Buckets account for the whole figure, so a reader can check the split.
+    assert sum(data["by_bucket_ml"].values()) == __import__("pytest").approx(
+        data["water_ml"], rel=1e-6
+    )
+
+
+def test_water_with_no_sessions_exits_nonzero(tmp_path: Path):
+    result = runner.invoke(app, ["water", "--data-dir", str(tmp_path), "--no-animate"])
+    assert result.exit_code == 1
+    assert "No sessions found" in result.output
+
+
+def test_install_statusline_can_pin_segments(tmp_path: Path):
+    settings = tmp_path / "settings.json"
+    result = runner.invoke(
+        app,
+        [
+            "install",
+            "statusline",
+            "--settings",
+            str(settings),
+            "--segments",
+            "ctx,water",
+            "--apply",
+        ],
+        input="y\n",
+    )
+    assert result.exit_code == 0
+    command = json.loads(settings.read_text(encoding="utf-8"))["statusLine"]["command"]
+    assert "--segments ctx,water" in command
+
+
+def test_install_statusline_rejects_an_unknown_segment(tmp_path: Path):
+    """The statusline tolerates typos silently; install must not."""
+    settings = tmp_path / "settings.json"
+    result = runner.invoke(
+        app,
+        ["install", "statusline", "--settings", str(settings), "--segments", "ctx,wter"],
+        input="y\n",
+    )
+    assert result.exit_code == 2
+    assert "Unknown segment" in result.output
+    assert not settings.exists()

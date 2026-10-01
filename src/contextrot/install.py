@@ -64,8 +64,14 @@ def is_contextrot_entry(value: object) -> bool:
         return False
 
 
-def statusline_entry() -> dict:
-    return {"type": "command", "command": surface_command("statusline")}
+def statusline_entry(segments: str = "") -> dict:
+    """The statusLine entry, optionally pinning which segments it renders.
+
+    Segments go in the stored command rather than into a config file of our own:
+    Claude Code already owns this line, and one place to look beats two.
+    """
+    surface = f"statusline --segments {segments}" if segments else "statusline"
+    return {"type": "command", "command": surface_command(surface)}
 
 
 def hook_entry() -> dict:

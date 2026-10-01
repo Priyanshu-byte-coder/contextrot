@@ -55,3 +55,22 @@ across Linux/macOS/Windows).
 ## Statistical honesty
 
 This tool's credibility rests on not overclaiming. Reports must always carry n-counts, confidence intervals, and the observational-diagnostic caveat. PRs that trade rigor for a scarier headline will be declined.
+
+## Regenerating the showcase media
+
+`SHOWCASE.md` promises that every figure in it comes from a synthetic dataset and that no real
+project name appears. Two scripts keep that true:
+
+```bash
+python scripts/make_showcase_data.py --out .showcase-data
+python scripts/capture_showcase.py --data-dir .showcase-data
+```
+
+The first writes a deterministic synthetic corpus — fixed seed, fixed timestamps, three fake
+projects, two agents, three models, with Opus degrading and Sonnet flat on the same work. The second
+re-renders the SVG assets straight from it via rich's SVG export, so no browser or headless renderer
+is needed.
+
+The PNGs in `assets/showcase/` are still hand-captured terminal shots. If you change output that one
+of them shows, either retake it from the synthetic corpus or say in your PR that it is now stale —
+**never** capture showcase media from your own sessions, since project names and volumes leak.

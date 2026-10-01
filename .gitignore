@@ -16,7 +16,10 @@ htmlcov/
 
 # Generated reports
 *.html
-!src/ctxprof/report/template.html.j2
+!src/contextrot/report/template.html.j2
+
+# Synthetic showcase corpus (regenerate with scripts/make_showcase_data.py)
+.showcase-data/
 
 # OS / editor
 .DS_Store

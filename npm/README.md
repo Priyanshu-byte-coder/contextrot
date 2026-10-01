@@ -30,6 +30,7 @@ A tool that can say "you're fine" is one you can trust when it says you're not
 ```sh
 npx contextrot --full      # the curve, per-model comparison, context breakdown
 npx contextrot waste       # the share of your spend that produced nothing
+npx contextrot water       # litres of water your agents used, filling up on screen
 npx contextrot agents      # which of your CLIs holds up best on your work
 npx contextrot status      # one live line for tmux, Starship or your shell prompt
 npx contextrot doctor      # what it can see, and why you have no verdict yet

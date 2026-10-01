@@ -67,6 +67,7 @@ One command reads the session logs your coding agent already saved and tells you
 | Find which agent rots first | `contextrot agents` | Claude Code vs Codex vs Gemini vs Cline, ranked on *your* work |
 | Know what to actually change | `contextrot fix` | plain fixes + a list of MCP servers you set up but never use (preview only, changes nothing) |
 | See what your rot actually costs | `contextrot waste` | the share of your token spend that produced nothing, broken down by what went wrong |
+| See what it cost the planet | `contextrot water` | litres of water your agents used, filling up on screen — the one figure here that's an estimate, and labelled as one |
 | Check whether you're improving | `contextrot trends` | week-over-week failure rate and startup-bloat trend |
 | Put a status badge in your README | `contextrot badge` | a local SVG verdict badge — no badge service sees your data |
 | See your context health right now | `contextrot status` | one live line for tmux, Starship, or your shell prompt — works with **any** agent |
@@ -114,6 +115,7 @@ contextrot -p myproject         # one project only
 contextrot --html report.html   # shareable single-file report + share card (100% local)
 contextrot --json               # every number, machine-readable
 contextrot waste                # the share of your spend that produced nothing
+contextrot water                # litres of water your agents drank (watch it fill up)
 contextrot projects             # rank your projects — which repo rots first
 contextrot agents               # rank your coding agents — which CLI rots first
 contextrot fix                  # what to change (dry-run; --apply to act, backs up first)
@@ -129,6 +131,7 @@ contextrot status --setup tmux  # print a copy-paste snippet (starship/bash/zsh/
 
 # Live inside Claude Code (see next section):
 contextrot install statusline   # context-health meter in your status bar
+contextrot install statusline --segments ctx,tokens,health,plan,water
 contextrot install hook         # one in-session warning when you cross your threshold
 contextrot mcp                  # let Claude Code query your rot report mid-session
 ```
@@ -212,6 +215,33 @@ API response; the meters simply disappear otherwise.
 
 Every bar fills in eighth-cells rather than whole ones, so it glides as the number climbs instead of
 sitting still for 10% and then jumping.
+
+Two segments are off by default. `cost` is the one number Claude Code already shows elsewhere, and
+`water` is an *estimate* sitting among measurements — see below. Turn either on at install time:
+
+```bash
+contextrot install statusline --segments ctx,tokens,health,plan,water --apply
+```
+
+```
+ctx 34% ███▍░░░░░░ · 342k/1M · ~45 turns left · water 681 ml ▁▂█▂▁
+```
+
+Those five cells are a droplet falling into a pool, advancing one frame per redraw — it descends,
+lands, throws a crown, and the ripples settle.
+
+**It will not look animated, and it can't.** Claude Code re-runs a status command when the
+conversation changes rather than on a timer, which in practice is a couple of times a minute, so the
+droplet advances a frame at a time. Nothing rendered into a status line can do better, because the
+host decides when to redraw it. For actual motion, give it its own process and put it in a split
+pane:
+
+```bash
+contextrot water --live
+```
+
+That animates continuously at 20 fps, fills toward the next round volume, splashes over it, and
+tracks whichever agent you are using right now.
 
 **When nothing is wrong, the line says nothing about it.** A clean curve produces no health text at
 all — the green bar is the message:
@@ -332,6 +362,7 @@ An adapter is one small file with a fixture and a test — [it's the paved first
 - ✅ Scoped calibration (1.5.0) — a measured threshold per agent, per model and per pair, so one agent's curve is never shown in another's session
 - ✅ Two reports (1.6.0) — a short default that answers the question, `--full` for the whole analysis
 - ✅ Headroom + `contextrot waste` (1.7.0) — what's left in turns rather than tokens, and the share of your spend that produced nothing
+- ✅ `contextrot water` (1.8.0) — the litres your agents used, with a sub-cell water animation, a `--live` pane, and a looping droplet in the status bar
 - OpenTelemetry GenAI span ingestion
 - Opt-in, anonymized aggregate stats → the **State of Context Rot** report: real-workload degradation curves across the community (off by default, aggregate-only, documented schema)
 

@@ -532,6 +532,203 @@ _SIGNAL_BLURB = {
 
 
 @app.command(rich_help_panel="Understand")
+def water(
+    data_dir: DataDir = None,
+    project: ProjectF = None,
+    days: Annotated[
+        int,
+        typer.Option("--days", "-d", help="Only the last N days (0 = every session on disk)."),
+    ] = 0,
+    seconds: Annotated[
+        float,
+        typer.Option("--seconds", help="How long the animation runs."),
+    ] = 5.0,
+    animate: Annotated[
+        bool,
+        typer.Option("--animate/--no-animate", help="Fill the tank, or print one still frame."),
+    ] = True,
+    live: Annotated[
+        bool,
+        typer.Option(
+            "--live",
+            help="Keep animating the session you're in right now. Ctrl-C to stop. "
+            "Best in a split pane beside your agent.",
+        ),
+    ] = False,
+    as_json: Annotated[bool, typer.Option("--json", help="Machine-readable output.")] = False,
+) -> None:
+    """How much water your coding agents have evaporated. Watch it fill up.
+
+    Inference runs in datacenters that evaporate water to stay cool, so your
+    token counts convert into litres. This is the one number contextrot
+    estimates rather than measures — the token counts are real, everything
+    after them comes from published per-prompt figures — so it is quoted with
+    its derivation and an honest plus-or-minus-2x, and it is never mixed in
+    with the measured parts of a report.
+
+    Covers every agent whose transcripts are still on your disk.
+
+    `--live` keeps animating the session you are in right now, for any agent —
+    put it in a split pane. A status line cannot do this: Claude Code re-runs the
+    status command when the conversation changes rather than on a timer, so the
+    `water` segment there shows a running total and advances its droplet a frame
+    at a time rather than animating.
+    """
+    from contextrot import water as wtr
+
+    if live:
+        _watch_water(data_dir)
+        return
+
+    sessions, _skipped = load_sessions(
+        data_dir=data_dir, project_filter=project, days=days or None
+    )
+    if not sessions:
+        console.print("[yellow]No sessions found.[/yellow] Try a wider --days.")
+        raise typer.Exit(code=1)
+
+    totals = wtr.totals_for_sessions(sessions)
+
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "water_ml": round(totals.ml, 2),
+                    "water_cooling_ml": round(totals.cooling_ml, 2),
+                    "water_generation_ml": round(totals.generation_ml, 2),
+                    "energy_wh": round(totals.wh, 4),
+                    "sessions": totals.sessions,
+                    "steps": totals.steps,
+                    "tokens": {
+                        "input": totals.input_tokens,
+                        "cache_creation": totals.cache_creation_tokens,
+                        "cache_read": totals.cache_read_tokens,
+                        "output": totals.output_tokens,
+                    },
+                    "by_bucket_ml": {k: round(v, 2) for k, v in totals.by_bucket.items()},
+                    "by_agent_ml": {k: round(v, 2) for k, v in totals.by_agent.items()},
+                    "by_model_ml": {k: round(v, 2) for k, v in totals.by_model.items()},
+                    "days": days or None,
+                    "estimated": True,
+                    "uncertainty_factor": wtr.UNCERTAINTY_FACTOR,
+                }
+            )
+        )
+        return
+
+    _render_water(totals, seconds=seconds, animate=animate)
+
+
+def _watch_water(data_dir: Optional[Path]) -> None:
+    """Animate the live session's water until Ctrl-C.
+
+    Separate from the status line rather than an improvement to it: Claude Code
+    re-runs a status command on conversation events, not on a timer, so nothing
+    rendered there can animate at a watchable rate. This owns its own clock.
+    """
+    from contextrot.live import detect_live_session
+    from contextrot.report import droplets
+    from contextrot.water import comparison, session_water
+
+    if not droplets.can_animate(console):
+        console.print(
+            "[yellow]--live needs a terminal.[/yellow] "
+            "Run [cyan]contextrot water[/cyan] for a one-off report instead."
+        )
+        raise typer.Exit(code=1)
+
+    def read():
+        session = detect_live_session(data_dir=data_dir, within_minutes=60)
+        if session is None:
+            return None
+        reading = session_water(session.path)
+        if reading is None:
+            return None
+        where = comparison(reading.ml) or "barely a drop yet"
+        return reading.ml, f"{session.source} · {where}"
+
+    droplets.watch(console, read)
+
+
+def _render_water(totals, *, seconds: float, animate: bool) -> None:
+    """The animation, then the breakdown behind it."""
+    from rich.padding import Padding
+
+    from contextrot import water as wtr
+    from contextrot.modelkey import model_label
+    from contextrot.report import droplets
+
+    # Short on purpose: the caption sits inside the animated frame and must not
+    # wrap (see droplets.frame), so the counts go in the breakdown below.
+    scope = wtr.comparison(totals.ml) or "barely a drop yet"
+    droplets.play(
+        console,
+        totals.ml,
+        f"of water · {scope}",
+        seconds=seconds,
+        animate=animate,
+    )
+
+    def body(renderable) -> None:
+        console.print(Padding(renderable, (0, 0, 0, 2)))
+
+    rows = totals.bucket_rows()
+    if rows:
+        console.print()
+        console.print(Text("  Where it went", style="bold"))
+        table = Table(box=None, show_header=False, pad_edge=False, padding=(0, 2, 0, 0))
+        table.add_column(style="dim")
+        table.add_column(justify="right")
+        table.add_column(justify="right", style="dim")
+        for label, ml, share in rows:
+            table.add_row(label, wtr.fmt_volume(ml), f"{share * 100:.0f}%")
+        body(table)
+
+    console.print()
+    for label, ranked, pretty in (
+        ("By agent", totals.ranked(totals.by_agent, limit=3), str),
+        ("By model", totals.ranked(totals.by_model, limit=3), model_label),
+    ):
+        # One line each, not a table: with two or three entries a table is more
+        # chrome than content, and this is the supporting detail, not the point.
+        if len(ranked) < 2:
+            continue
+        line = Text(f"{label:<10}", style="dim")
+        line.append(" · ".join(f"{pretty(name)} {wtr.fmt_volume(ml)}" for name, ml, _ in ranked))
+        body(line)
+
+    console.print()
+    # The two halves of the figure, because people reasonably assume "water" means
+    # the cooling towers, and the power station's share is the larger of the two.
+    split = Text(style="dim")
+    split.append(wtr.fmt_volume(totals.cooling_ml), style="cyan")
+    split.append(" cooling the datacenter, ")
+    split.append(wtr.fmt_volume(totals.generation_ml), style="cyan")
+    split.append(" generating the electricity")
+    body(split)
+
+    scale = Text(style="dim")
+    scale.append(wtr.fmt_energy(totals.wh), style="cyan")
+    scale.append(
+        f" of energy · {wtr.fmt_tokens(totals.total_tokens)} tokens · "
+        f"{totals.sessions:,} sessions · {totals.steps:,} steps"
+    )
+    body(scale)
+
+    band = Text(style="dim")
+    band.append("Somewhere between ")
+    band.append(wtr.fmt_volume(totals.ml / wtr.UNCERTAINTY_FACTOR), style="cyan")
+    band.append(" and ")
+    band.append(wtr.fmt_volume(totals.ml * wtr.UNCERTAINTY_FACTOR), style="cyan")
+    band.append(", on the honest error bar below.")
+    body(band)
+
+    console.print()
+    body(Text(wtr.provenance(), style="dim"))
+    console.print()
+
+
+@app.command(rich_help_panel="Understand")
 def trends(
     data_dir: DataDir = None,
     days: Days = 90,
@@ -983,7 +1180,7 @@ def status(
         typer.Option(
             "--segments",
             help="Which segments to show, comma-separated: ctx, tokens, health, "
-            "plan, cost (or 'all'). Default: ctx,tokens,health,plan.",
+            "plan, water, cost (or 'all'). Default: ctx,tokens,health,plan.",
         ),
     ] = None,
     legend: Annotated[
@@ -1051,6 +1248,14 @@ def status(
         if cal_set is not None
         else None
     )
+    # JSON reports water unconditionally — a machine-readable payload has no
+    # line width to protect — but the rendered line only pays for it when asked.
+    live_water = None
+    if fmt == "json" or "water" in picked:
+        from contextrot.water import session_water
+
+        live_water = session_water(session.path)
+
     if fmt == "json":
         knee = cal.knee_pct if cal is not None and cal.calibrated else None
         rate = cal.rate_at_fill(session.fill_pct) if cal is not None else None
@@ -1083,6 +1288,9 @@ def status(
                     "scope": cal.scope_kind if cal is not None else None,
                     "scope_label": cal.scope_label if cal is not None else None,
                     "scope_is_fallback": cal.is_fallback if cal is not None else None,
+                    "water_ml": (
+                        round(live_water.ml, 2) if live_water is not None else None
+                    ),
                     "age_seconds": round(session.age_seconds),
                 }
             )
@@ -1099,6 +1307,7 @@ def status(
             window=session.window or None,
             segments=picked,
             turn_cost=cal_set.turn_cost if cal_set is not None else None,
+            water=live_water,
         )
     )
 
@@ -1110,7 +1319,7 @@ def statusline(
         typer.Option(
             "--segments",
             help="Which segments to show, comma-separated: ctx, tokens, health, "
-            "plan, cost (or 'all'). Default: ctx,tokens,health,plan.",
+            "plan, water, cost (or 'all'). Default: ctx,tokens,health,plan.",
         ),
     ] = None,
     legend: Annotated[
@@ -1212,6 +1421,29 @@ InstallSettings = Annotated[
 ]
 
 
+def _checked_segments(spec: Optional[str]) -> str:
+    """Normalize a --segments spec, or exit on a name that doesn't exist.
+
+    The statusline itself drops unknown names silently — it runs on every render
+    and must never fail a session over a typo. Install is the opposite: it is a
+    one-off, deliberate act, and silently writing a config that quietly omits
+    the segment you asked for is how people conclude the feature is broken.
+    """
+    from contextrot.statusline import SEGMENT_NAMES, parse_segments
+
+    if not spec:
+        return ""
+    wanted = [w.strip().lower() for w in spec.split(",") if w.strip()]
+    unknown = [w for w in wanted if w not in SEGMENT_NAMES and w != "all"]
+    if unknown:
+        console.print(
+            f"[red]Unknown segment(s):[/red] {', '.join(unknown)}\n"
+            f"Choose from: {', '.join(SEGMENT_NAMES)} (or 'all')."
+        )
+        raise typer.Exit(code=2)
+    return ",".join(parse_segments(spec))
+
+
 @app.command(rich_help_panel="Set up & troubleshoot")
 def install(
     target: Annotated[
@@ -1232,6 +1464,15 @@ def install(
             help="Replace an existing non-contextrot statusLine (still backed up).",
         ),
     ] = False,
+    segments: Annotated[
+        Optional[str],
+        typer.Option(
+            "--segments",
+            help="For 'statusline': which segments the installed line renders "
+            "(ctx, tokens, health, plan, water, cost, or 'all'). "
+            "Default: ctx,tokens,health,plan.",
+        ),
+    ] = None,
     settings: InstallSettings = None,
 ) -> None:
     """Install a contextrot live surface into Claude Code. Dry-run by default."""
@@ -1260,7 +1501,7 @@ def install(
         raise typer.Exit(code=1) from e
 
     if target == "statusline":
-        entry = statusline_entry()
+        entry = statusline_entry(_checked_segments(segments))
         existing = current.get("statusLine")
         if existing == entry:
             console.print(f"[green]Already installed[/green] in {path} — nothing to do.")
@@ -1294,7 +1535,9 @@ def install(
         raise typer.Exit(code=0)
 
     if target == "statusline":
-        current["statusLine"] = statusline_entry()
+        # The entry previewed above, not a fresh one: re-deriving it was harmless
+        # while it took no arguments, and silently drops --segments now that it does.
+        current["statusLine"] = entry
         done = "[green]Statusline installed.[/green] It appears on your next interaction."
     else:
         add_hook(current)

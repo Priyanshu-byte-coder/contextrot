@@ -26,6 +26,12 @@ Segments, in fixed order (pick with ``segments=``):
 ``plan``
     Claude.ai subscription rate limits (5-hour and weekly). Claude Code only,
     Pro/Max only, and absent until the session's first API response.
+``water``
+    Water this session has evaporated in a datacenter, with a wave that
+    travels as the number climbs. An estimate, not a measurement (see
+    ``contextrot.water``), and off by default for exactly that reason — this
+    line's other numbers are measured, and a guess should not sit among them
+    unless you asked for it.
 ``cost``
     Session cost in USD, as Claude Code estimates it. Off by default.
 
@@ -71,10 +77,10 @@ _PLAN_CELLS = 5
 _EIGHTHS = " ▏▎▍▌▋▊▉"
 
 # Every segment this module can render, in the order they appear in the line.
-SEGMENT_NAMES = ("ctx", "tokens", "health", "plan", "cost")
+SEGMENT_NAMES = ("ctx", "tokens", "health", "plan", "water", "cost")
 
-# Cost is opt-in: it answers a different question than context health, and it
-# is the one number Claude Code already shows elsewhere.
+# Cost and water are opt-in: cost is the one number Claude Code already shows
+# elsewhere, and water is an estimate sitting next to measurements.
 DEFAULT_SEGMENTS = ("ctx", "tokens", "health", "plan")
 
 # Rate-limit coloring. Unlike the context curve these are hard quotas, so
@@ -85,6 +91,25 @@ PLAN_CRIT_PCT = 90.0
 # Below this many typical turns of headroom, the gap between a typical turn
 # and an expensive one starts to matter, so the heavy count appears too.
 TURNS_TIGHT = 12
+
+# One droplet falling into a pool, as a loop. Hand-drawn rather than generated:
+# five cells is far too few for a formula to read as a droplet, and these frames
+# are chosen so the shape is unmistakable at a glance — the drop descends through
+# three heights (apostrophe high, middle dot, full stop on the baseline), lands,
+# throws a crown, and the ripples spread and settle.
+#
+# Every frame is exactly _DROP_CELLS wide so the rest of the line never shifts.
+_DROP_CELLS = 5
+_DROP_FRAMES = (
+    "▁▁'▁▁",  # drop high above the surface
+    "▁▁·▁▁",  # falling
+    "▁▁.▁▁",  # about to land
+    "▁▂█▂▁",  # impact
+    "▂▅▆▅▂",  # crown
+    "▃▄▂▄▃",  # collapsing back
+    "▂▁▂▁▂",  # ripples spreading
+    "▁▁▁▁▁",  # calm, ready to loop
+)
 
 LEGEND = """\
 contextrot statusline segments
@@ -152,6 +177,19 @@ contextrot statusline segments
                        worse. Only appears alongside a warning — on its own it
                        is a number without a question.
 
+  water 0.81 L ▁▂█▂▁  How much water this session has used, counting both
+                       datacenter cooling and the water consumed generating
+                       the electricity. Estimated from the session's token
+                       counts — the only number on this line that is an
+                       estimate rather than a measurement, which is why it is
+                       opt in. Assume plus or minus 2x; `contextrot water`
+                       shows the full derivation and the totals across every
+                       session.
+
+                       The five cells beside it are a droplet falling into a
+                       pool, looping one frame per redraw: it descends, lands,
+                       throws a crown, and the ripples settle.
+
   5h █▎░░░ 24%         Claude.ai subscription rate limits consumed: the 5-hour
   wk ██░░░ 41%         rolling window and the weekly one, each with its own
                        meter, green through red. Time until reset is appended
@@ -174,15 +212,18 @@ class Palette:
     red: str
     dim: str
     reset: str
+    # Water is not a health signal, so it borrows none of the three status
+    # colors. Defaulted so any existing positional Palette still constructs.
+    cyan: str = ""
 
 
 # ANSI escapes; Claude Code and shell prompts render these directly.
-ANSI = Palette("\x1b[32m", "\x1b[33m", "\x1b[31m", "\x1b[2m", "\x1b[0m")
+ANSI = Palette("\x1b[32m", "\x1b[33m", "\x1b[31m", "\x1b[2m", "\x1b[0m", "\x1b[36m")
 # No markup at all — for anything that would show the escapes literally.
 PLAIN = Palette("", "", "", "", "")
 # tmux status bars do NOT interpret ANSI; they use their own #[...] tags.
 TMUX = Palette(
-    "#[fg=green]", "#[fg=yellow]", "#[fg=red]", "#[fg=colour244]", "#[default]"
+    "#[fg=green]", "#[fg=yellow]", "#[fg=red]", "#[fg=colour244]", "#[default]", "#[fg=cyan]"
 )
 
 PALETTES = {"ansi": ANSI, "plain": PLAIN, "tmux": TMUX}
@@ -433,6 +474,33 @@ def _plan_segment(limits: dict, p: Palette) -> str | None:
     return " · ".join(shown)
 
 
+def droplet_frame(index: int) -> str:
+    """One frame of the droplet loop, by frame number.
+
+    Driven by a render count rather than a clock. A status line is redrawn on
+    events, not on a timer, so a wall-clock phase would jump an arbitrary
+    distance between redraws; a render count advances by exactly one, which is
+    what makes the cycle read as a falling droplet instead of a flicker. It also
+    makes the frame reproducible, which is the only reason it can be tested.
+    """
+    return _DROP_FRAMES[int(index) % len(_DROP_FRAMES)]
+
+
+def _water_segment(live: object, p: Palette) -> str | None:
+    """``water 0.81 L ▁▂█▂▁`` — this session's estimated water use, animated.
+
+    Silent below a millilitre: the first few steps of a session round to
+    nothing, and "water 0.00 ml" is a worse answer than no answer.
+    """
+    ml = getattr(live, "ml", None)
+    if not isinstance(ml, (int, float)) or isinstance(ml, bool) or ml < 1.0:
+        return None
+    from contextrot.water import fmt_volume
+
+    frame = droplet_frame(getattr(live, "frame", 0) or 0)
+    return f"{p.dim}water{p.reset} {p.cyan}{fmt_volume(float(ml))} {frame}{p.reset}"
+
+
 def _cost_segment(cost: object, p: Palette) -> str | None:
     if not isinstance(cost, (int, float)) or isinstance(cost, bool):
         return None
@@ -448,6 +516,7 @@ def render_fill(
     window: int | None = None,
     segments: tuple[str, ...] = DEFAULT_SEGMENTS,
     turn_cost: TurnCost | None = None,
+    water: object = None,
 ) -> str:
     """The status line for a known context fill. Never raises."""
     try:
@@ -461,6 +530,7 @@ def render_fill(
             limits=None,
             cost=None,
             turn_cost=turn_cost,
+            water=water,
         )
     except Exception:  # noqa: BLE001 — a broken statusline helps nobody
         return "ctx —"
@@ -477,6 +547,7 @@ def _compose(
     limits: dict | None,
     cost: object,
     turn_cost: TurnCost | None = None,
+    water: object = None,
 ) -> str:
     """Assemble the selected segments into one line."""
     calibrated = cal is not None and cal.calibrated
@@ -510,6 +581,11 @@ def _compose(
 
     if "plan" in segments and limits is not None:
         seg = _plan_segment(limits, p)
+        if seg:
+            parts.append(seg)
+
+    if "water" in segments:
+        seg = _water_segment(water, p)
         if seg:
             parts.append(seg)
 
@@ -553,6 +629,14 @@ def _render(
     cost_obj = payload.get("cost")
     cost = cost_obj.get("total_cost_usd") if isinstance(cost_obj, dict) else None
 
+    # Only when the segment is on: this is the one piece of the line that
+    # touches the filesystem, and an unasked-for segment should cost nothing.
+    water = None
+    if "water" in segments:
+        from contextrot.water import session_water
+
+        water = session_water(payload.get("transcript_path"))
+
     return _compose(
         fill_pct=fill,
         cal=cal,
@@ -563,4 +647,5 @@ def _render(
         limits=limits if isinstance(limits, dict) else None,
         cost=cost,
         turn_cost=turn_cost,
+        water=water,
     )

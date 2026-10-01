@@ -127,6 +127,52 @@ apportioning a precision that isn't there. `--json` included, labelled with its 
 
 ---
 
+## And how much water did that drink?
+
+`contextrot water`
+
+Inference runs in datacenters that evaporate water to stay cool, and the power stations feeding them
+consume more. The token counts contextrot already parses convert into litres. The tank fills on
+screen while the number counts up, then the breakdown says where the water went.
+
+<div align="center">
+  <img src="assets/showcase/water.svg" alt="contextrot water: a filled tank with a rippling surface, the total in large block digits, a where-it-went breakdown dominated by cache reads, per-agent and per-model splits, the cooling and generation halves, and the estimate's full derivation" width="900">
+</div>
+
+The breakdown is the interesting part: **cache reads, not output, are where the water goes** — 84%
+of it here, against 12% for everything the models actually wrote. Most people assume the answers
+dominate. For an agent replaying a large context on every step, they are a small fraction.
+
+A still frame can't show the part worth showing. The water surface is tracked in eighths of a row,
+so it moves eight times per row rather than jumping whole cells; its height per column is two sine
+waves at incommensurate frequencies travelling in opposite directions, so the crests never realign
+and the surface never visibly loops; and every landing droplet adds a decaying ripple, which is what
+makes a splash read as a splash. Level and number share one ease-out curve, so they decelerate into
+the final value together instead of stopping dead.
+
+This is the **one figure contextrot estimates rather than measures**, and it never appears without
+its derivation attached — the 0.6 Wh per 1k output tokens, the price-anchored prefill and replay
+rates, the two separate water terms for datacenter cooling and electricity generation, and a plain
+plus-or-minus-2x. It even says what biases it **low**: long-context attention is not priced
+separately, and correcting that needs a constant nobody publishes.
+
+Which is why it is a separate command rather than a line in the report, and off by default in the
+status line. `--no-animate` skips to the numbers, `--json` emits the whole derivation including the
+cooling and generation halves. The full chain is in [docs/methodology.md](docs/methodology.md).
+
+### Watch it fill while you work
+
+```bash
+contextrot water --live
+```
+
+The same scene, animating continuously at 20 fps with its own clock, tracking whichever agent's
+session is live. The pool fills toward the next round volume and splashes over it, and the level
+eases toward real data rather than snapping, so a jump in the number still looks like water
+arriving. Put it in a split pane and leave it running; Ctrl-C to stop.
+
+---
+
 ## What should you actually change?
 
 `contextrot fix`
@@ -186,6 +232,33 @@ green bar is the message.
 <div align="center">
   <img src="assets/showcase/statusline.png" alt="Claude Code statusline showing context fill colored green/yellow/red against the user's measured threshold, with headroom in turns and the failure ratio" width="900">
 </div>
+
+### A live water meter, if you want one
+
+```bash
+contextrot install statusline --segments ctx,tokens,health,plan,water --apply
+```
+
+<div align="center">
+  <img src="assets/showcase/statusline-water.svg" alt="Claude Code statusline with the water segment on: context fill and bar, absolute tokens, rate-limit meters, and this session's estimated water use with a droplet beside it" width="900">
+</div>
+
+This session's running total, read incrementally — only the transcript bytes appended since the last
+render are parsed, so a warm render costs about a millisecond.
+
+The five cells beside it are a droplet falling into a pool, advancing one frame per redraw:
+
+```
+▁▁▁▁▁   ▁▁'▁▁   ▁▁·▁▁   ▁▁.▁▁   ▁▂█▂▁   ▂▅▆▅▂   ▃▄▂▄▃   ▂▁▂▁▂
+calm    drop    falling  lands   impact  crown   collapse ripples
+```
+
+**It will not look animated, and it can't.** Claude Code re-runs a status command when the
+conversation changes rather than on a timer, which in practice is a couple of times a minute, so the
+droplet advances a frame at a time. Nothing rendered into a status line can do better, because the
+host decides when to redraw it — which is what `contextrot water --live` is for.
+
+---
 
 ### A one-time warning the moment you cross your threshold
 
