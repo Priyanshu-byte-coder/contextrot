@@ -97,7 +97,7 @@ main { position: relative; z-index: 3; }
 .frame-pct { color: var(--ink-2); font-variant-numeric: tabular-nums; min-width: 4ch; text-align: right; }
 .frame-pct b { font-weight: 400; color: var(--ink); }
 .frame-body { position: absolute; left: 0; right: 0; bottom: 0; top: var(--bar, 30px); }
-.frame-chart { position: absolute; inset: 8% 4% 16% 4%; width: 92%; height: 76%; overflow: visible; opacity: var(--chart, 0); }
+.frame-chart { position: absolute; inset: 68% 4% 13% 4%; width: 92%; height: 19%; overflow: visible; opacity: var(--chart, 0); }
 .fc-line { fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 10px rgba(141, 176, 255, 0.9)); stroke-dasharray: 1; stroke-dashoffset: calc(1 - var(--draw, 0)); }
 .frame-labels { position: absolute; inset: auto 4% 6% 4%; display: flex; justify-content: space-between; opacity: var(--chart, 0); font-family: var(--pixel); font-size: 13px; color: var(--ink-2); }
 .fl b { font-weight: 400; color: #fff; font-size: 22px; margin-right: 6px; }

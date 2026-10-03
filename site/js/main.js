@@ -213,7 +213,7 @@ function update() {
   const aO = [smooth(0.03, 0.12, pa) * (1 - smooth(0.3, 0.38, pa)), smooth(0.58, 0.68, pa), smooth(0.76, 0.86, pa)];
   aEls.forEach((el) => el.style.setProperty("--o", aO[+el.dataset.a].toFixed(3)));
   extra.chart = smooth(0.6, 0.68, pa);
-  extra.draw = smooth(0.62, 0.86, pa);
+  extra.draw = smooth(0.6, 0.78, pa);
 
   // the window's journey
   if (field) {
