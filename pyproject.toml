@@ -65,7 +65,7 @@ packages = ["src/contextrot"]
 # use absolute URLs, so PyPI renders them without the files being in the sdist —
 # and the showcase media alone was most of a 7 MB download.
 [tool.hatch.build.targets.sdist]
-exclude = ["/assets", "/scripts", "/.github", "/npm"]
+exclude = ["/assets", "/scripts", "/.github", "/npm", "/site"]
 
 [tool.ruff]
 line-length = 100
