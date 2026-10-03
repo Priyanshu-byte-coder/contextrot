@@ -7,6 +7,8 @@
   <p><strong>Does your coding agent get worse as its context fills?</strong><br>
   Find out on the sessions already on your disk — and what actually moves its failure rate.</p>
 
+  <p><a href="https://priyanshu-byte-coder.github.io/contextrot/"><strong>See the story →</strong> priyanshu-byte-coder.github.io/contextrot</a></p>
+
   <a href="https://pypi.org/project/contextrot/"><img src="https://img.shields.io/pypi/v/contextrot?color=2a78d6" alt="PyPI version"></a>
   <a href="https://pepy.tech/projects/contextrot"><img src="https://static.pepy.tech/personalized-badge/contextrot?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="Downloads"></a>
   <a href="https://pypi.org/project/contextrot/"><img src="https://img.shields.io/pypi/pyversions/contextrot?color=2a78d6" alt="Python versions"></a>
