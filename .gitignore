@@ -17,6 +17,7 @@ htmlcov/
 # Generated reports
 *.html
 !src/contextrot/report/template.html.j2
+!site/index.html
 
 # Synthetic showcase corpus (regenerate with scripts/make_showcase_data.py)
 .showcase-data/
