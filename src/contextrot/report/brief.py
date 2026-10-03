@@ -23,12 +23,13 @@ sentence tells you the answer.
 
 from __future__ import annotations
 
-from rich.console import Console
+from rich.console import Console, Group
 from rich.padding import Padding
 from rich.text import Text
 
 from contextrot.analysis import AnalysisResult
 from contextrot.analysis.rot import RotCurve
+from contextrot.anim import Reveal, play
 from contextrot.report._hero import HEADLINE_WORDS, VERDICT_COLOR, VERDICT_ICON
 
 # Prescriptions worth interrupting someone for. The rest are in --full: a list
@@ -139,9 +140,50 @@ def _cost_line(result: AnalysisResult) -> Text | None:
     return t
 
 
-def _actions(result: AnalysisResult) -> list[Text]:
+def _factor_line(result: AnalysisResult) -> Text | None:
+    """The strongest *other* thing that moves the failure rate, if one is clear.
+
+    Context fill is left out because the paragraph above already answered it.
+    This line matters most on a clean verdict: "fill isn't hurting you" is a dead
+    end on its own, and "but working at night is" is something you can act on.
+    """
+    if result.verdict_kind == "insufficient":
+        return None
+    from contextrot.analysis.factors import strongest
+
+    top = strongest(result.factors, exclude=("context_fill",))
+    if top is None:
+        return None
+    lead = "What does move it: " if result.verdict_kind == "clean" else "Also worth knowing: "
+    t = Text()
+    t.append(lead, style="bold")
+    t.append(top.finding[:1].lower() + top.finding[1:])
+    return t
+
+
+def _live_suggestion(result: AnalysisResult) -> str:
+    """The one live surface worth suggesting to *this* user.
+
+    Claude Code users without the statusline get the statusline, because a report
+    you run once is forgotten and a meter you see every turn is not. Users of other
+    agents get `status`, which works in any terminal. Anyone already set up is
+    pointed at `share` instead of being told to install what they have.
+    """
+    uses_claude = any(s.source == "claude-code" for s in result.sessions)
+    if not uses_claude:
+        return "contextrot status --setup tmux"
+    try:
+        from contextrot.install import claude_settings_path, is_contextrot_entry, read_settings
+
+        installed = is_contextrot_entry(read_settings(claude_settings_path()).get("statusLine"))
+    except Exception:  # noqa: BLE001 — a suggestion must never break the report
+        installed = False
+    return "contextrot share" if installed else "contextrot install statusline --apply"
+
+
+def _actions(result: AnalysisResult) -> list:
     """The top prescriptions, or an explicit all-clear."""
-    lines: list[Text] = []
+    lines: list = []
     if not result.prescriptions:
         t = Text("→ ", style="bold green")
         if result.verdict_kind == "clean":
@@ -156,20 +198,35 @@ def _actions(result: AnalysisResult) -> list[Text]:
         head.append(p.title, style="bold")
         lines.append(head)
         if p.impact:
-            lines.append(Text(f"   {p.impact}", style="dim"))
+            # Padding, not leading spaces, so a wrapped impact line stays under
+            # the title instead of falling back to the margin.
+            lines.append(Padding(Text(p.impact, style="dim"), (0, 0, 0, 3)))
     return lines
 
 
-def render(result: AnalysisResult, console: Console | None = None) -> None:
-    """Print the short report."""
+def render(
+    result: AnalysisResult, console: Console | None = None, *, animate: bool = False
+) -> None:
+    """Print the short report.
+
+    The verdict prints immediately and is never animated: it is the answer, and
+    making someone wait for the answer is the one thing an animation must not do.
+    What follows it — the explanation, the evidence, the action — arrives a line at
+    a time, in the order you would read it anyway.
+
+    No counting-up numbers here, deliberately. These are sentences with figures
+    inside them, and a figure that changes width mid-count ("$9" to "$248.91")
+    re-wraps the paragraph around it. Bars and standalone totals animate; prose
+    does not.
+    """
     console = console or Console()
     kind = result.verdict_kind
     color = VERDICT_COLOR[kind]
 
-    def body(renderable) -> None:
+    def pad(renderable):
         # Padding, not leading spaces: it indents wrapped continuation lines
         # too, and these sentences are long enough to wrap on a narrow terminal.
-        console.print(Padding(renderable, (0, 0, 0, 2)))
+        return Padding(renderable, (0, 0, 0, 2))
 
     console.print()
     headline = Text(f" {VERDICT_ICON[kind].strip()} {HEADLINE_WORDS.get(kind, '')} ")
@@ -177,24 +234,37 @@ def render(result: AnalysisResult, console: Console | None = None) -> None:
     console.print(headline)
     console.print()
 
-    body(_what_happened(result))
-    console.print()
-    body(_evidence(result))
+    blocks: list = [pad(_what_happened(result))]
+    factor = _factor_line(result)
+    if factor is not None:
+        blocks.append(pad(factor))
+    blocks.append(Text())
+    blocks.append(pad(_evidence(result)))
     cost = _cost_line(result)
     if cost is not None:
-        body(cost)
-    console.print()
+        blocks.append(pad(cost))
+    blocks.append(Text())
+    blocks.append(Text("  What to do", style="bold"))
+    blocks.extend(pad(line) for line in _actions(result))
+    blocks.append(Text())
 
-    console.print(Text("  What to do", style="bold"))
-    for line in _actions(result):
-        body(line)
-    console.print()
-
+    # Three next steps, not a paragraph about each: the curve behind the verdict,
+    # what else moves the rate, and the one live surface that fits this user.
     hint = Text(style="dim")
-    hint.append("Run ")
-    hint.append("contextrot --full", style="cyan")
-    hint.append(" for the curve behind this, the comparisons, and where your context goes.")
-    body(hint)
+    hint.append("Next  ")
+    for i, cmd in enumerate(("contextrot --full", "contextrot factors", _live_suggestion(result))):
+        if i:
+            hint.append("  ·  ")
+        hint.append(cmd, style="cyan")
+    blocks.append(pad(hint))
+
+    def build(rv: Reveal):
+        shown = list(rv.visible(blocks))
+        # Hold the final height from the first frame so the block does not grow
+        # downward under the cursor as lines arrive.
+        return Group(*shown, *(Text() for _ in range(len(blocks) - len(shown))))
+
+    play(console, build, animate=animate)
     console.print()
 
 

@@ -1,324 +1,227 @@
 <div align="center">
-  <h1>contextrot — every feature, in pictures</h1>
-  <p><strong>A quick visual tour of what the tool shows you.</strong><br>
-  One command reads the session logs your coding agent already saved and tells you
-  where it starts getting worse. Everything runs on your machine — no API keys, no uploads.</p>
-  <p><em>All screenshots below are from a synthetic demo dataset, so no real project
-  names appear. Your own report uses your real sessions.</em></p>
-  <p><a href="README.md">← back to the README</a> · <a href="#install">install</a></p>
+  <h1>contextrot — every screen</h1>
+  <p><strong>What each command shows you, and what to do with it.</strong></p>
+  <p><em>Every image here is generated from a synthetic dataset by
+  <a href="scripts/make_showcase_data.py"><code>make_showcase_data.py</code></a> and
+  <a href="scripts/capture_showcase.py"><code>capture_showcase.py</code></a> — three made-up
+  projects, two agents, four models — so no real project, path or person appears, and any
+  screen can be regenerated after a change. Your own report uses your real sessions.</em></p>
+  <p><a href="README.md">← back to the README</a></p>
 </div>
 
 ---
 
-## The answer, in fifteen seconds
+## The answer
 
 `contextrot`
 
-The default report answers three questions and stops: **am I degrading, what is it costing me,
-and what should I change.** Everything else is one flag away.
+The verdict first, then the one or two facts behind it, the strongest other thing moving
+your failure rate, what it's costing, and what to change. Three next steps at the bottom —
+including the live surface that fits the agent you actually use.
 
-```
- ✓ NO MEASURABLE ROT
+<div align="center">
+  <img src="assets/showcase/hero.svg" alt="The short report: context rot detected at about 60% fill, 2.2 times worse than a fresh context, mistakes compounding as the strongest other factor, 8.1% of spend on slipped steps, and the advice to compact before 60%" width="900">
+</div>
 
-  Your agent slips 3.3% of the time when the context is nearly full, against
-  4.0% when it's fresh. Filling the window is not what's hurting your output.
+Here the agent slips 2.2× as often with a nearly full context as with a fresh one, and the
+damage starts around 60%. On your own sessions the answer may well be *no rot at all* —
+lab benchmarks find it under conditions real work often never reaches, and the report will
+say so plainly rather than invent a threshold.
 
-  Measured on 28,617 steps from the last 30 days.
-  3.4% of your token spend went to steps that slipped — retries, failed edits
-  and re-reads that produced nothing.
+## What actually moves the failure rate
 
-  What to do
-  → Nothing about context fill — your setup is holding up.
+`contextrot factors`
 
-  Run contextrot --full for the curve behind this, the comparisons, and where
-  your context goes.
-```
+Context fill is one suspect. This checks the rest with the same statistics and ranks them.
+**●** clear means the two groups' confidence ranges don't overlap; **◐** maybe means they do;
+**○** means no effect — and those rows stay in the table, because "time of day doesn't matter
+for you" is an answer too.
 
-The rule behind every line: if it wouldn't change what you do next, it lives in `--full`.
+<div align="center">
+  <img src="assets/showcase/factors.svg" alt="contextrot factors: mistakes so far, context fill and time of day are clear effects; model is a maybe; coding agent and steps since you last spoke show no effect" width="900">
+</div>
 
----
+Notice *mistakes so far* at the top. In the dataset behind this image, failures were
+generated **independently** of earlier failures — and the factor still lights up, because
+sessions that have made more mistakes are, on average, deeper into their context. That's
+confounding, it happens on real data too, and it's why the report says *association, not
+causation* under every table.
 
-## The full analysis — where exactly does it start failing?
+## The full analysis
 
 `contextrot --full`
 
-The headline is a plain verdict — **rot**, **edge rot**, **clean**, or **not enough data** —
-followed by the exact context-fill % where you start failing, a failure-rate curve with
-confidence intervals, where your context is being spent, and concrete fixes. Use more than
-one model and it compares them head-to-head automatically (here Opus rots 3.8× while Sonnet
-stays flat on the same work).
+The curve behind the verdict: failure rate per 10% of context fill with confidence ranges,
+whether mistakes snowball, side-by-side comparisons, and where your context window actually
+goes.
 
 <div align="center">
-  <img src="assets/showcase/report.png" alt="contextrot terminal report: rot verdict, failure-rate curve by context fill, reversal table, per-model comparison, composition, and prescriptions" width="900">
+  <img src="assets/showcase/report-full.svg" alt="The full report: verdict panel with a slip-rate sparkline, failure rate per fill bucket with the bars turning red past the threshold, the reversal table, model, project and agent comparisons, and the context composition panel" width="900">
 </div>
 
-### The same report as a shareable HTML page
+### As a single HTML file
 
 `contextrot --html report.html`
 
-One self-contained local file (still zero network) with a built-in 1200×630 share card you
-can save as a PNG and post.
+The same analysis as one self-contained, offline HTML file with a downloadable image card —
+something you can attach to a PR or post. Charts grow in as you scroll.
 
 <div align="center">
-  <img src="assets/showcase/report-html.png" alt="contextrot HTML report with verdict hero, charts, per-model and per-project breakdowns, and a share card" width="720">
+  <img src="assets/showcase/report-html.png" alt="The HTML report: verdict hero, charts, per-model and per-project breakdowns, and a share card" width="720">
 </div>
 
----
-
-## Which of your repos rots first?
+## Which of your repos degrades first?
 
 `contextrot projects`
 
-An independent curve and verdict per project, ranked worst-first — so the specific repo whose
-`CLAUDE.md` or MCP setup is dragging you down stops hiding inside your all-projects average.
+Each repo gets its own curve and verdict, worst first — so the one whose CLAUDE.md or MCP
+setup is dragging you down stops hiding inside your all-projects average.
 
 <div align="center">
-  <img src="assets/showcase/projects.png" alt="Per-project context-rot comparison table: auth-service rot, web-dashboard edge, cli-tools clean" width="820">
+  <img src="assets/showcase/projects.svg" alt="contextrot projects: auth-service shows context rot from about 40% fill, while cli-tools and web-dashboard stay clean" width="820">
 </div>
 
-## Which coding agent rots first?
+## Which coding agent holds up best?
 
 `contextrot agents`
 
-Claude Code vs Codex CLI vs Gemini CLI vs Cline — each with its own curve and verdict on a
-shared scale, measured on *your* workload rather than a benchmark's.
+The same comparison across agent CLIs, measured on your work rather than a benchmark's.
 
 <div align="center">
-  <img src="assets/showcase/agents.png" alt="Per-agent context-rot comparison: Claude Code vs Codex CLI" width="820">
+  <img src="assets/showcase/agents.svg" alt="contextrot agents: Claude Code shows context rot with a threshold near 60%, Codex CLI stays clean" width="820">
 </div>
 
----
-
-## Are you actually improving?
+## Is it getting better?
 
 `contextrot trends`
 
-Week-over-week failure rate and startup-overhead bloat, with an honest verdict on whether the
-change cleared statistical noise. This is the before/after check for `contextrot fix`.
+Week by week, with a bar so the direction is a shape rather than four percentages — and an
+explicit call on whether the change clears statistical noise.
 
 <div align="center">
-  <img src="assets/showcase/trends.png" alt="Week-over-week trend table showing failure rate improving from 9.9% to 6.1% and startup tokens shrinking" width="820">
+  <img src="assets/showcase/trends.svg" alt="contextrot trends: the failure rate falls from 8.9% to 3.9% over four weeks, and the drop clears statistical noise" width="820">
 </div>
 
-## What is the rot actually costing you?
+## What is it costing you?
 
 `contextrot waste`
 
-Usage trackers can tell you what you spent. None of them can tell you which part was **wasted**,
-because that needs the failure signals: a retry of a call that already errored, an edit that
-missed, a re-read of a file still sitting in context. Those tokens were paid for and bought
-nothing.
-
-```
-  3.4% of your token spend went to steps that slipped
-  1,082 of 28,701 steps over the last 30 days · $248.91 of $7,342.39 at API list prices
-
-  What went wrong                              Steps     Cost
-  Tool calls that errored                        581  $137.99
-  Files re-read that were already in context     337   $71.74
-  Same call repeated after an error              161   $36.04
-  Edits that missed their target                  44    $8.48
-  “actually, let me fix that”                     27    $8.49
-```
-
-One step can trip several of these, so the rows overlap and the output says so rather than
-apportioning a precision that isn't there. `--json` included, labelled with its pricing basis
-(API list prices — on a subscription that's "what this would have cost", not a bill you got).
-
----
-
-## And how much water did that drink?
-
-`contextrot water`
-
-Inference runs in datacenters that evaporate water to stay cool, and the power stations feeding them
-consume more. The token counts contextrot already parses convert into litres. The tank fills on
-screen while the number counts up, then the breakdown says where the water went.
+Usage trackers tell you what you spent. This tells you which part bought nothing — a call
+that errored, an edit that missed, a re-read of a file already in context — ranked by cost.
 
 <div align="center">
-  <img src="assets/showcase/water.svg" alt="contextrot water: a filled tank with a rippling surface, the total in large block digits, a where-it-went breakdown dominated by cache reads, per-agent and per-model splits, the cooling and generation halves, and the estimate's full derivation" width="900">
+  <img src="assets/showcase/waste.svg" alt="contextrot waste: 8.1% of token spend went to steps that slipped, led by tool calls that errored" width="760">
 </div>
 
-The breakdown is the interesting part: **cache reads, not output, are where the water goes** — 84%
-of it here, against 12% for everything the models actually wrote. Most people assume the answers
-dominate. For an agent replaying a large context on every step, they are a small fraction.
+Costs are at API list prices, so on a subscription read them as "what this would have cost",
+not a bill. One step can trip several signals, so the rows overlap, and the screen says so
+rather than inventing a split.
 
-A still frame can't show the part worth showing. The water surface is tracked in eighths of a row,
-so it moves eight times per row rather than jumping whole cells; its height per column is two sine
-waves at incommensurate frequencies travelling in opposite directions, so the crests never realign
-and the surface never visibly loops; and every landing droplet adds a decaying ripple, which is what
-makes a splash read as a splash. Level and number share one ease-out curve, so they decelerate into
-the final value together instead of stopping dead.
-
-This is the **one figure contextrot estimates rather than measures**, and it never appears without
-its derivation attached — the 0.6 Wh per 1k output tokens, the price-anchored prefill and replay
-rates, the two separate water terms for datacenter cooling and electricity generation, and a plain
-plus-or-minus-2x. It even says what biases it **low**: long-context attention is not priced
-separately, and correcting that needs a constant nobody publishes.
-
-Which is why it is a separate command rather than a line in the report, and off by default in the
-status line. `--no-animate` skips to the numbers, `--json` emits the whole derivation including the
-cooling and generation halves. The full chain is in [docs/methodology.md](docs/methodology.md).
-
-### Watch it fill while you work
-
-```bash
-contextrot water --live
-```
-
-The same scene, animating continuously at 20 fps with its own clock, tracking whichever agent's
-session is live. The pool fills toward the next round volume and splashes over it, and the level
-eases toward real data rather than snapping, so a jump in the number still looks like water
-arriving. Put it in a split pane and leave it running; Ctrl-C to stop.
-
----
-
-## What should you actually change?
+## What should you change?
 
 `contextrot fix`
 
-Turns the report's findings into concrete actions, and points out MCP servers you configured
-but never actually use. **Dry-run by default — it writes nothing** unless you add `--apply`
-(which backs up first and is reversible).
+The report's prescriptions as checkable actions, plus the size of your global CLAUDE.md and
+the MCP servers you configured but never call — each one is overhead on every session.
+Nothing changes until you add `--apply`, and even then only unused *global* servers are
+disabled, reversibly, after a backup.
 
 <div align="center">
-  <img src="assets/showcase/fix.png" alt="contextrot fix: prescriptions plus a list of unused MCP servers, dry-run by default" width="820">
+  <img src="assets/showcase/fix.svg" alt="contextrot fix: prescriptions, a CLAUDE.md size report and a list of unused MCP servers, in dry-run mode" width="820">
 </div>
 
-## What sessions were parsed?
-
-`contextrot sessions`
-
-A plain list of everything that was read, with each session's peak context fill.
-
-<div align="center">
-  <img src="assets/showcase/sessions.png" alt="contextrot sessions: list of parsed sessions with project, steps, peak prompt tokens, and model" width="820">
-</div>
-
----
-
-## Use it live, inside Claude Code
-
-The report tells you where you degrade *after the fact*. These put it in front of you **while
-you're working** — and they're the reason a Claude Code user gets the most out of contextrot.
-All three are dry-run by default, write only with `--apply`, back up your settings first, and
-undo cleanly with `contextrot uninstall`.
-
-### A live context-health meter in your status bar
+## Watch it live, inside Claude Code
 
 `contextrot install statusline --apply`
 
-Your current context fill, colored against your *own* measured curve — not a generic
-"yellow at 70%." It knows where *you* start failing, and recalibrates on every run.
-
-```
-ctx 34% ███▍░░░░░░ · 340k/1M · ~45 turns left
-ctx 85% ████████▌░ · 850k/1M · ~10 turns left, ~2 heavy · ▲ past threshold ~70% · slip 9.2% — 1.9× fresh
-ctx 99% █████████▉ · 198k/200k · no room for another turn
-```
-
-**Headroom in the unit you plan in.** `660k left` is precise and abstract; `~45 turns left` is
-the thing you decide with. It's measured from your own history — the median turn adds a certain
-number of tokens, so what remains divides into roughly that many more turns. Under 12 it goes
-yellow and adds the heavy case, because one wide grep can cost several times a typical turn.
-
-**The threshold is the one for what you're running right now.** Curves are stored per agent, per
-model and per pair, and the line resolves the narrowest that fits your session. When it has to
-borrow from a broader slice it says so — `(all agents)` — rather than passing it off as yours.
-
-**When nothing is wrong, it says nothing.** A clean curve renders no health text at all; the
-green bar is the message.
+A live meter, colored against *your* measured curve: how full the window is, how many
+turns are left, and your Claude.ai rate limits. When nothing is wrong, it says nothing
+about it — the green bar is the message.
 
 <div align="center">
-  <img src="assets/showcase/statusline.png" alt="Claude Code statusline showing context fill colored green/yellow/red against the user's measured threshold, with headroom in turns and the failure ratio" width="900">
+  <img src="assets/showcase/statusline.svg" alt="The Claude Code status line: context fill bar, tokens used and left, and the five-hour and weekly rate-limit meters" width="900">
 </div>
 
-### A live water meter, if you want one
-
-```bash
-contextrot install statusline --segments ctx,tokens,health,plan,water --apply
-```
+`contextrot install hook --apply` adds one warning the instant a session crosses your
+threshold, then silence until the next crossing:
 
 <div align="center">
-  <img src="assets/showcase/statusline-water.svg" alt="Claude Code statusline with the water segment on: context fill and bar, absolute tokens, rate-limit meters, and this session's estimated water use with a droplet beside it" width="900">
+  <img src="assets/showcase/hook.png" alt="A Claude Code warning that fires once when context crosses the measured degradation threshold" width="820">
 </div>
 
-This session's running total, read incrementally — only the transcript bytes appended since the last
-render are parsed, so a warm render costs about a millisecond.
+Not on Claude Code? `contextrot status` prints the same line for any agent — in tmux,
+Starship or your prompt. `contextrot status --setup tmux` gives you the snippet.
 
-The five cells beside it are a droplet falling into a pool, advancing one frame per redraw:
+## Share your curve
 
+`contextrot share --copy`
+
+Your curve as anonymized JSON — verdict, rates and step counts per fill bucket, which
+factors moved your rate — copied to your clipboard. **It sends nothing.** Flat objects stay
+on one line so you can actually read the whole thing before you paste it:
+
+```json
+{
+  "schema": 1,
+  "tool": "contextrot",
+  "verdict": {"kind": "rot", "threshold_pct": 60, "fresh_rate": 0.0498, "deep_rate": 0.111, "ratio": 2.229, "significant": true, ...},
+  "curve": [
+    {"lo": 0, "hi": 10, "n": 788, "failures": 31},
+    ...
+    {"lo": 60, "hi": 70, "n": 611, "failures": 71},
+    ...
+  ],
+  ...
+}
 ```
-▁▁▁▁▁   ▁▁'▁▁   ▁▁·▁▁   ▁▁.▁▁   ▁▂█▂▁   ▂▅▆▅▂   ▃▄▂▄▃   ▂▁▂▁▂
-calm    drop    falling  lands   impact  crown   collapse ripples
-```
 
-**It will not look animated, and it can't.** Claude Code re-runs a status command when the
-conversation changes rather than on a timer, which in practice is a couple of times a minute, so the
-droplet advances a frame at a time. Nothing rendered into a status line can do better, because the
-host decides when to redraw it — which is what `contextrot water --live` is for.
+No project names, paths, prompts, code, timestamps or costs, and private model names pooled
+as `other`. Paste it into a
+[Share your curve](https://github.com/Priyanshu-byte-coder/contextrot/issues/new?template=share_your_curve.yml)
+issue. What's in it, exactly: [docs/sharing.md](docs/sharing.md).
 
----
-
-### A one-time warning the moment you cross your threshold
-
-`contextrot install hook --apply`
-
-One nudge, the instant a session crosses *your* measured failure threshold — then silence
-until the next crossing. It uses the threshold for the model actually running, not a blend.
-No threshold in your data? It says nothing at all.
-
-<div align="center">
-  <img src="assets/showcase/hook.png" alt="Claude Code hook warning that fires once when context crosses the measured degradation threshold" width="820">
-</div>
-
-### Let Claude Code check its own rot, mid-task
-
-`claude mcp add contextrot -- contextrot mcp`
-
-Runs contextrot as an MCP server so Claude Code itself can pull your rot report during a
-session and decide to compact, warn you, or switch models. Still zero network — a local pipe,
-not a socket.
-
----
-
-## Which curve is the statusline quoting?
+## Why don't I have a verdict?
 
 `contextrot doctor`
 
-Thresholds differ by agent and by model, so `doctor` tables every curve that was measured and
-stored — and flags the ones that blend across slices you're not currently using.
+Your version, every agent it looked for and where, how much data a verdict needs and how
+close you are, and every curve the live surfaces can quote from — narrowest first.
 
-```
-  Measured curve           Steps  Threshold  Measured to
-  Claude Code + Opus 5    21,367  none                 —
-  Claude Code + Opus 4.8   3,619  none          60% full
-  Claude Code + Fable 5    2,484  none          40% full
-  Opus 5                  21,378  none                 —  blends all agents
-  Claude Code             28,269  none                 —  blends all models
-  all agents and models   28,448  none                 —  blends all agents
-  Live surfaces use the narrowest of these that fits your current session.
-```
+<div align="center">
+  <img src="assets/showcase/doctor.svg" alt="contextrot doctor: version and platform, agents found and where it looked, fresh and deep step counts against what a verdict needs, and the table of measured curves by agent and model" width="900">
+</div>
 
-It also explains which agents were found, where it looked, and what's still missing when you
-have no verdict yet.
+## And how much water did it take?
+
+`contextrot water`
+
+Inference runs in datacenters that evaporate water to stay cool, and the power stations
+feeding them consume more. The tank fills while the number counts up, then the breakdown
+says where it went — mostly cache reads, not the answers people assume dominate.
+
+<div align="center">
+  <img src="assets/showcase/water.svg" alt="contextrot water: a filled tank, the total in block digits, a breakdown by cache reads, output and fresh input, per-agent and per-model splits, and the derivation" width="860">
+</div>
+
+The one figure contextrot *estimates* rather than measures, and it always says so, with its
+derivation and a plain ±2×. `contextrot water --live` animates it continuously in a split
+pane; the `water` status-line segment shows the current session's running total.
+
+<div align="center">
+  <img src="assets/showcase/statusline-water.svg" alt="The status line with the water segment on" width="900">
+</div>
+
+## What was parsed?
+
+`contextrot sessions`
+
+<div align="center">
+  <img src="assets/showcase/sessions.svg" alt="contextrot sessions: the parsed sessions for one project, with start time, steps, peak prompt size and model" width="820">
+</div>
 
 ---
 
-## Install
-
-```bash
-uvx contextrot
-# or
-pip install contextrot
-contextrot
-```
-
-No config, no API keys, no uploads. contextrot makes **zero network calls** — local files in,
-terminal or local HTML out.
-
 <div align="center">
-  <strong>Ran it on your own sessions?</strong>
-  <a href="https://github.com/Priyanshu-byte-coder/contextrot/discussions/8">Share your rot curve</a>
-  — flat curves count too. If it told you something useful, a ⭐ helps other agent users find it.
+  <p><code>uvx contextrot</code> — no config, no API keys, zero network calls.</p>
+  <p><a href="docs/guide.md">The full guide</a> · <a href="docs/methodology.md">Methodology</a> · <a href="docs/sharing.md">Sharing</a></p>
 </div>

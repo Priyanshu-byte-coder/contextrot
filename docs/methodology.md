@@ -95,6 +95,59 @@ adds on the order of a thousand tokens — so headroom expressed in steps runs t
 reads as unlimited. Below 50 observed turns no headroom is reported at all; an estimate built on
 noise reads as a promise.
 
+## Factors
+
+`contextrot factors` asks which axis, beyond context fill, separates steps that slipped from
+steps that didn't. It uses the same per-step failure signal and the same Wilson intervals as
+the rot curve.
+
+| Factor | Groups | Kind |
+|---|---|---|
+| Context fill | 0–20, 20–40, 40–60, 60–80, 80–100% | ordered |
+| Mistakes so far | reversals earlier in the session: none, 1, 2, 3–4, 5+ | ordered |
+| Steps since you last spoke | 1–3, 4–10, 11–25, 26+ | ordered |
+| Time of day | night 0–6h, morning 6–12h, afternoon 12–18h, evening 18–24h, local clock | categorical |
+| Model | model family | categorical |
+| Coding agent | adapter | categorical |
+
+**Comparison.** A group takes part only with at least 150 steps — the same floor a verdict
+needs per zone. *Ordered* factors ask a directional question ("does it get worse as this
+grows?"), so they compare their two **ends**. Comparing the worst group with the best finds
+bumps instead: on real data an early version flagged "2 earlier mistakes" against "1" while
+"5+" sat back at baseline. *Categorical* factors ask "which is best?", so they compare the
+worst group with the best.
+
+**Strength.** *Clear* needs a ratio of at least 1.3 — the verdict's own minimum — **and**
+non-overlapping 95% intervals. *Maybe* is the ratio without the separation. Anything smaller
+is *no effect*. Picking the best and worst of several categories flatters the gap, which is
+why "clear" demands separation rather than a p-value, and why "maybe" exists.
+
+**Specific choices.**
+
+- *Steps since you last spoke* excludes step 0, the agent's first move after a prompt. It
+  can't be a retry (nothing has failed yet this turn) and rarely self-corrects, so it slips at
+  a fraction of the usual rate for purely mechanical reasons. Sessions whose adapter recorded
+  no turn boundaries are left out of this factor entirely rather than counted from the start.
+- *Time of day* uses the clock of the machine running the analysis.
+- Models with an unknown family are left out of the model factor.
+
+**Axes considered and rejected.**
+
+- *Session length.* Short sessions slip about twice as often on real data — largely because a
+  session that goes badly gets abandoned early. The arrow points the other way, and "keep
+  sessions long" would be exactly the wrong advice.
+- *Startup overhead* (system prompt, tool schemas, CLAUDE.md). The difference between light
+  and heavy setups is dominated by which agent produced them, so the comparison measures
+  agents, not setup weight. It stays in the composition panel as a description.
+
+**Caveats.** Factors are associations, and they echo each other: sessions that have made more
+mistakes are also, on average, deeper into their context, so *mistakes so far* can light up
+from fill alone. The synthetic dataset behind the showcase demonstrates exactly this — its
+failures are generated independently of earlier failures, and the factor still shows an
+effect. Steps within a session aren't independent either, so the intervals are narrower than
+a session-level analysis would give. Read the table as a map of where to look, not a list
+of causes.
+
 ## Cost figures
 
 Per-step cost uses published API list prices per model (input, output, cache read, cache write). For subscription users this is the *API-equivalent value*, not a bill. "Spend on degraded steps" sums the cost of steps where a failure signal fired — a lower bound on rework cost, since it excludes the follow-up work those failures caused. `contextrot waste` breaks the same figure down by signal; because one step can trip several signals, those rows overlap and deliberately do not sum to the total. Unknown models fall back to conservative defaults and are marked estimated.
@@ -161,4 +214,4 @@ The derivation is reproducible: `contextrot water --json` emits the raw token co
 
 ## Reproducibility
 
-`contextrot --json` emits every per-step signal record and per-bucket statistic, so any number in the report can be recomputed independently. `contextrot waste --json` and `contextrot status --format json` do the same for the cost breakdown and the live reading, the latter naming which scope answered.
+`contextrot --json` emits every per-step signal record and per-bucket statistic, so any number in the report can be recomputed independently. `contextrot waste --json` and `contextrot status --format json` do the same for the cost breakdown and the live reading, the latter naming which scope answered. `contextrot factors --json` gives every factor's groups with their step and failure counts, and `contextrot share` the anonymized aggregate described in [sharing.md](sharing.md).

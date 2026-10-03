@@ -9,17 +9,18 @@ import contextlib
 import json
 import sys
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, NoReturn, Optional
 
 import typer
-from rich.console import Console
+from rich.console import Console, Group
 from rich.table import Table
 from rich.text import Text
 
-from contextrot import __version__
+from contextrot import __version__, anim
 from contextrot.analysis import analyze, load_sessions
 from contextrot.analysis.by_project import build_project_comparison, project_label
 from contextrot.analysis.by_source import build_agent_comparison
+from contextrot.analysis.factors import factor_dict
 from contextrot.analysis.fixes import (
     claude_md_report,
     disable_global_servers,
@@ -33,16 +34,133 @@ for _stream in (sys.stdout, sys.stderr):
         with contextlib.suppress(ValueError, OSError):
             _stream.reconfigure(encoding="utf-8", errors="replace")
 
+# The order commands appear in --help, which also decides the order of the
+# panels (each panel appears where its first command does). Registration order
+# is file order, which is an accident of history; this is the order a newcomer
+# should meet them in. Commands Claude Code invokes on your behalf come last,
+# in their own panel, because nobody types them.
+_HELP_ORDER = (
+    # Understand
+    "factors", "waste", "agents", "projects", "trends", "sessions", "water",
+    # Watch it live
+    "status",
+    # Share
+    "share", "badge",
+    # Act on it
+    "fix",
+    # Set up & troubleshoot
+    "install", "uninstall", "doctor",
+    # Run by your agent, not by you
+    "statusline", "hook", "mcp",
+)
+
+
+class _OrderedGroup(typer.core.TyperGroup):
+    def list_commands(self, ctx):  # type: ignore[no-untyped-def]
+        rank = {name: i for i, name in enumerate(_HELP_ORDER)}
+        return sorted(super().list_commands(ctx), key=lambda n: rank.get(n, len(rank)))
+
+
 app = typer.Typer(
     name="contextrot",
+    cls=_OrderedGroup,
     help=(
-        "Find out where your coding agent starts degrading. "
-        "Analyzes agent transcripts already on your disk — nothing is uploaded."
+        "Does your coding agent get worse as its context fills? Find out on the "
+        "sessions already on your disk — and what actually moves its failure rate. "
+        "Nothing is uploaded."
     ),
+    epilog=(
+        "Start here:  [cyan]contextrot[/cyan]  →  [cyan]contextrot factors[/cyan]  →  "
+        "[cyan]contextrot install statusline --apply[/cyan]"
+    ),
+    rich_markup_mode="rich",
     no_args_is_help=False,
     add_completion=False,
 )
 console = Console()
+
+# Set once by the top-level callback, read by every command. A module global
+# rather than a parameter on fifteen commands: typer runs the callback before any
+# subcommand, so this is the one place the choice can be made once. Animation is
+# cosmetic, so nothing in the package may behave differently because of it — see
+# contextrot.anim, where a disabled animation is literally the same render call.
+_ANIMATE = True
+
+
+def _animate() -> bool:
+    return _ANIMATE
+
+
+_AGENTS_READ = "Claude Code, Codex CLI, Gemini CLI, Qwen Code, OpenCode and Cline/Roo/Kilo Code"
+
+
+def _no_sessions(days: Optional[int] = None) -> NoReturn:
+    """The one empty-state message, so every command fails the same helpful way.
+
+    There used to be ten variants of "No sessions found." with different hints or
+    none. The useful version says what was searched, and the two things that fix it
+    most often: a wider --days window, and `doctor` to see where it looked.
+    """
+    from rich.padding import Padding
+
+    window = f" in the last {days} days" if days else ""
+    console.print(f"[yellow]No sessions found{window}.[/yellow]")
+    tips = []
+    if days:
+        tips.append("[cyan]--days 0[/cyan] to include all history")
+    tips.append("[cyan]contextrot doctor[/cyan] to see where it looked")
+    # Padding rather than leading spaces, so the lines indent when they wrap too.
+    console.print(
+        Padding(
+            Text.from_markup(
+                f"[dim]contextrot reads {_AGENTS_READ} transcripts.[/dim]\n"
+                "Try " + ", or ".join(tips) + "."
+            ),
+            (0, 0, 0, 2),
+        )
+    )
+    raise typer.Exit(code=1)
+
+
+def _analyze(
+    data_dir: Optional[Path],
+    project: Optional[str],
+    days: Optional[int],
+    window: Optional[int] = None,
+    *,
+    quiet: bool = False,
+):
+    """``analyze`` with a progress bar, for every command that parses transcripts.
+
+    Parsing is the one slow step in the tool. 1.9 gave the main report a progress
+    bar and left six other commands parsing the same files in silence; this is
+    the one place it happens now. ``quiet`` is for --json, whose output is for a
+    program and must stay clean.
+    """
+    from contextrot.anim import Parsing
+
+    with Parsing(console, animate=_animate() and not quiet) as progress:
+        return analyze(
+            data_dir=data_dir,
+            project_filter=project,
+            days=days,
+            window_override=window,
+            progress=progress,
+        )
+
+
+def _load(
+    data_dir: Optional[Path],
+    project: Optional[str],
+    days: Optional[int],
+    *,
+    quiet: bool = False,
+):
+    """``load_sessions`` with the same progress bar, for commands that skip analysis."""
+    from contextrot.anim import Parsing
+
+    with Parsing(console, animate=_animate() and not quiet) as progress:
+        return load_sessions(data_dir, project, days, progress=progress)
 
 # Optional[...] rather than `X | None`: these are evaluated at runtime (module
 # level and again by typer's introspection), and pipe unions need Python 3.10.
@@ -102,25 +220,32 @@ def main(
     html: Annotated[
         Optional[Path], typer.Option("--html", help="Also write a shareable HTML report.")
     ] = None,
+    animate: Annotated[
+        bool,
+        typer.Option(
+            "--animate/--no-animate",
+            help="Grow bars and reveal rows as they are drawn. On in a terminal, "
+            "off when piped. Also respects CONTEXTROT_NO_ANIM and CI.",
+        ),
+    ] = True,
     version: Annotated[
         Optional[bool],
         typer.Option("--version", callback=_version_callback, is_eager=True),
     ] = None,
 ) -> None:
     """Analyze your sessions and print the rot report."""
+    global _ANIMATE
+    _ANIMATE = animate
     if ctx.invoked_subcommand is not None:
         return
 
-    result = analyze(data_dir=data_dir, project_filter=project, days=days, window_override=window)
+    # Parsing is the only slow step in the tool — tens of thousands of steps across
+    # six adapters — and it used to be seconds of nothing. --json stays silent: its
+    # output is for a program, and a progress bar on stderr-less stdout is noise.
+    result = _analyze(data_dir, project, days, window, quiet=as_json)
 
     if not result.sessions:
-        console.print(
-            "[yellow]No agent sessions found.[/yellow] "
-            "contextrot reads local transcripts from Claude Code, Codex CLI, Gemini CLI, "
-            "Qwen Code, OpenCode, and Cline/Roo/Kilo Code. "
-            "Point elsewhere with --data-dir, or widen the range with --days."
-        )
-        raise typer.Exit(code=1)
+        _no_sessions(days)
 
     # Refresh the calibration cache for live surfaces (statusline, hooks) —
     # only from a real run over the default data dirs, so pointing --data-dir
@@ -222,6 +347,7 @@ def main(
                 "pricing_basis": "api_list_prices",
             },
             "prescriptions": [vars(p) for p in result.prescriptions],
+            "factors": [factor_dict(f) for f in result.factors],
         }
         print(json.dumps(payload, indent=2))
     else:
@@ -230,7 +356,7 @@ def main(
         # Short by default. The full analysis is the right output when you are
         # investigating, and the wrong one when you just want to know whether
         # you're fine — the answer used to be four panels down.
-        (render if full else render_brief)(result, console)
+        (render if full else render_brief)(result, console, animate=animate)
 
         # The most common false alarm: a short --days window hides enough
         # history for a verdict. If we came up short but there's likely more
@@ -261,33 +387,35 @@ def sessions(
     days: Days = 30,
 ) -> None:
     """List parsed sessions with their peak context fill."""
-    found, skipped = load_sessions(data_dir, project, days)
+    found, skipped = _load(data_dir, project, days)
     if not found:
-        console.print("[yellow]No sessions found.[/yellow]")
-        raise typer.Exit(code=1)
+        _no_sessions(days)
 
     # Only spend a column on the agent when sessions actually span several.
     multi_agent = len({s.source for s in found}) > 1
 
-    table = Table(title=f"{len(found)} sessions ({skipped} skipped)")
-    table.add_column("Started", style="dim")
-    table.add_column("Project")
-    if multi_agent:
-        table.add_column("Agent", style="dim")
-    table.add_column("Steps", justify="right")
-    table.add_column("Peak prompt", justify="right")
-    table.add_column("Model", style="dim")
-
-    for s in found:
-        started = s.started_at.strftime("%Y-%m-%d %H:%M") if s.started_at else "?"
-        model = s.steps[0].model if s.steps else "?"
-        project_name = _project_basename(s.project) if s.project else "?"
-        cells = [started, project_name]
+    def _table(visible):
+        table = Table(title=f"{len(found)} sessions ({skipped} skipped)")
+        table.add_column("Started", style="dim")
+        table.add_column("Project")
         if multi_agent:
-            cells.append(s.source)
-        cells += [str(len(s.steps)), f"{s.peak_prompt_tokens:,}", model]
-        table.add_row(*cells)
-    console.print(table)
+            table.add_column("Agent", style="dim")
+        table.add_column("Steps", justify="right")
+        table.add_column("Peak prompt", justify="right")
+        table.add_column("Model", style="dim")
+
+        for s in visible:
+            started = s.started_at.strftime("%Y-%m-%d %H:%M") if s.started_at else "?"
+            model = s.steps[0].model if s.steps else "?"
+            project_name = _project_basename(s.project) if s.project else "?"
+            cells = [started, project_name]
+            if multi_agent:
+                cells.append(s.source)
+            cells += [str(len(s.steps)), f"{s.peak_prompt_tokens:,}", model]
+            table.add_row(*cells)
+        return table
+
+    anim.rows(console, _table, found, animate=_animate())
 
 
 @app.command(rich_help_panel="Understand")
@@ -297,10 +425,9 @@ def projects(
     window: Window = None,
 ) -> None:
     """Compare context rot across your projects — which repo degrades first."""
-    result = analyze(data_dir=data_dir, project_filter=None, days=days, window_override=window)
+    result = _analyze(data_dir, None, days, window)
     if not result.sessions:
-        console.print("[yellow]No sessions found.[/yellow]")
-        raise typer.Exit(code=1)
+        _no_sessions(days)
 
     # require_two=False so a single-project user still sees that project's curve.
     stats = build_project_comparison(result.steps, require_two=False)
@@ -314,33 +441,38 @@ def projects(
     _icon = {"rot": "✗", "edge": "!", "clean": "✓", "insufficient": "?"}
     _style = {"rot": "red", "edge": "yellow", "clean": "green", "insufficient": "yellow"}
 
-    table = Table(title="Context rot by project")
-    table.add_column("Project", style="cyan")
-    table.add_column("Steps", justify="right", style="dim")
-    table.add_column("Fresh", justify="right")
-    table.add_column("Deep", justify="right")
-    table.add_column("Ratio", justify="right")
-    table.add_column("Threshold", justify="right")
-    table.add_column("Verdict")
+    def _table(visible):
+        table = Table(title="Context rot by project")
+        table.add_column("Project", style="cyan")
+        table.add_column("Steps", justify="right", style="dim")
+        table.add_column("Fresh", justify="right")
+        table.add_column("Deep", justify="right")
+        table.add_column("Ratio", justify="right")
+        table.add_column("Threshold", justify="right")
+        table.add_column("Verdict")
 
-    for p in stats:
-        c = p.curve
-        fresh = f"{c.low_fill_rate:.1%}" if c.low_fill_rate is not None else "n/a"
-        deep = f"{c.high_fill_rate:.1%}" if c.high_fill_rate is not None else "n/a"
-        ratio = c.degradation_ratio
-        if ratio is None:
-            ratio_s = "n/a"
-        elif ratio == float("inf"):
-            ratio_s = "∞"
-        else:
-            ratio_s = f"{ratio:.1f}×"
-        knee_s = f"~{c.knee_pct}%" if c.knee_pct is not None else "none"
-        if p.is_other:
-            verdict_cell = "[dim]—[/dim]"
-        else:
-            verdict_cell = f"[{_style[p.verdict_kind]}]{_icon[p.verdict_kind]} {p.verdict_kind}[/]"
-        table.add_row(p.label, str(p.steps), fresh, deep, ratio_s, knee_s, verdict_cell)
-    console.print(table)
+        for p in visible:
+            c = p.curve
+            fresh = f"{c.low_fill_rate:.1%}" if c.low_fill_rate is not None else "n/a"
+            deep = f"{c.high_fill_rate:.1%}" if c.high_fill_rate is not None else "n/a"
+            ratio = c.degradation_ratio
+            if ratio is None:
+                ratio_s = "n/a"
+            elif ratio == float("inf"):
+                ratio_s = "∞"
+            else:
+                ratio_s = f"{ratio:.1f}×"
+            knee_s = f"~{c.knee_pct}%" if c.knee_pct is not None else "none"
+            if p.is_other:
+                verdict_cell = "[dim]—[/dim]"
+            else:
+                verdict_cell = (
+                    f"[{_style[p.verdict_kind]}]{_icon[p.verdict_kind]} {p.verdict_kind}[/]"
+                )
+            table.add_row(p.label, str(p.steps), fresh, deep, ratio_s, knee_s, verdict_cell)
+        return table
+
+    anim.rows(console, _table, stats, animate=_animate())
 
 
 @app.command(rich_help_panel="Understand")
@@ -350,10 +482,9 @@ def agents(
     window: Window = None,
 ) -> None:
     """Compare context rot across your coding agents — which CLI degrades first."""
-    result = analyze(data_dir=data_dir, project_filter=None, days=days, window_override=window)
+    result = _analyze(data_dir, None, days, window)
     if not result.sessions:
-        console.print("[yellow]No sessions found.[/yellow]")
-        raise typer.Exit(code=1)
+        _no_sessions(days)
 
     # require_two=False so a single-agent user still sees that agent's curve.
     stats = build_agent_comparison(result.steps, require_two=False)
@@ -367,36 +498,97 @@ def agents(
     _icon = {"rot": "✗", "edge": "!", "clean": "✓", "insufficient": "?"}
     _style = {"rot": "red", "edge": "yellow", "clean": "green", "insufficient": "yellow"}
 
-    table = Table(title="Context rot by agent")
-    table.add_column("Agent", style="cyan")
-    table.add_column("Steps", justify="right", style="dim")
-    table.add_column("Fresh", justify="right")
-    table.add_column("Deep", justify="right")
-    table.add_column("Ratio", justify="right")
-    table.add_column("Threshold", justify="right")
-    table.add_column("Verdict")
+    def _table(visible):
+        table = Table(title="Context rot by agent")
+        table.add_column("Agent", style="cyan")
+        table.add_column("Steps", justify="right", style="dim")
+        table.add_column("Fresh", justify="right")
+        table.add_column("Deep", justify="right")
+        table.add_column("Ratio", justify="right")
+        table.add_column("Threshold", justify="right")
+        table.add_column("Verdict")
 
-    for a in stats:
-        c = a.curve
-        fresh = f"{c.low_fill_rate:.1%}" if c.low_fill_rate is not None else "n/a"
-        deep = f"{c.high_fill_rate:.1%}" if c.high_fill_rate is not None else "n/a"
-        ratio = c.degradation_ratio
-        if ratio is None:
-            ratio_s = "n/a"
-        elif ratio == float("inf"):
-            ratio_s = "∞"
+        for a in visible:
+            c = a.curve
+            fresh = f"{c.low_fill_rate:.1%}" if c.low_fill_rate is not None else "n/a"
+            deep = f"{c.high_fill_rate:.1%}" if c.high_fill_rate is not None else "n/a"
+            ratio = c.degradation_ratio
+            if ratio is None:
+                ratio_s = "n/a"
+            elif ratio == float("inf"):
+                ratio_s = "∞"
+            else:
+                ratio_s = f"{ratio:.1f}×"
+            knee_s = f"~{c.knee_pct}%" if c.knee_pct is not None else "none"
+            if a.is_other:
+                verdict_cell = "[dim]—[/dim]"
+            else:
+                verdict_cell = (
+                    f"[{_style[a.verdict_kind]}]{_icon[a.verdict_kind]} {a.verdict_kind}[/]"
+                )
+            table.add_row(a.label, str(a.steps), fresh, deep, ratio_s, knee_s, verdict_cell)
+        return table
+
+    anim.rows(console, _table, stats, animate=_animate())
+
+
+@app.command(rich_help_panel="Share")
+def share(
+    data_dir: DataDir = None,
+    project: ProjectF = None,
+    days: Days = 30,
+    window: Window = None,
+    copy: Annotated[
+        bool, typer.Option("--copy", help="Also copy the block to your clipboard.")
+    ] = False,
+) -> None:
+    """Your curve, anonymized, to add to the community dataset. Sends nothing.
+
+    Every claim about context rot today comes from lab benchmarks. Nobody knows
+    what it looks like on real coding work across many people — this is how we
+    find out. It prints a JSON block of aggregate numbers (verdict, rates and
+    step counts per fill bucket, factor comparisons, per-agent and per-model
+    summaries) and stops. No project names, paths, prompts, code, timestamps or
+    dollar figures. You read it, then paste it into a GitHub issue yourself.
+
+    The JSON goes to stdout and the instructions to stderr, so
+    `contextrot share > my-curve.json` saves just the data.
+    """
+    from contextrot.share import SUBMIT_URL, build_share, copy_to_clipboard, to_json
+
+    result = _analyze(data_dir, project, days, window)
+    if not result.steps:
+        _no_sessions(days)
+
+    block = to_json(build_share(result, version=__version__))
+    print(block)
+
+    # Guidance on stderr: it's for the person, and must not end up in a file
+    # someone redirected the curve into.
+    err = Console(stderr=True)
+    err.print()
+    err.print(
+        "[dim]That's everything in it — aggregate rates and counts only. No project "
+        "names, paths, prompts, code, timestamps or costs.[/dim]"
+    )
+    if result.verdict_kind == "insufficient":
+        err.print(
+            "[dim]Your verdict is 'not enough data' yet. That still helps; a curve "
+            "from more sessions helps more ([cyan]--days 0[/cyan] for all history).[/dim]"
+        )
+    if copy:
+        if copy_to_clipboard(block):
+            err.print("[green]Copied to your clipboard.[/green]")
         else:
-            ratio_s = f"{ratio:.1f}×"
-        knee_s = f"~{c.knee_pct}%" if c.knee_pct is not None else "none"
-        if a.is_other:
-            verdict_cell = "[dim]—[/dim]"
-        else:
-            verdict_cell = f"[{_style[a.verdict_kind]}]{_icon[a.verdict_kind]} {a.verdict_kind}[/]"
-        table.add_row(a.label, str(a.steps), fresh, deep, ratio_s, knee_s, verdict_cell)
-    console.print(table)
+            err.print("[yellow]Couldn't reach a clipboard tool[/yellow] — copy the block above.")
+    err.print("Paste it here:")
+    # soft_wrap so the URL is never broken across lines — a wrapped URL pastes
+    # as two broken halves.
+    err.print(f"  [cyan]{SUBMIT_URL}[/cyan]", soft_wrap=True)
+    err.print("[dim]Nothing has been sent anywhere.[/dim]")
 
 
-@app.command(rich_help_panel="Act on it")
+@app.command(rich_help_panel="Share")
 def badge(
     output: Annotated[
         Optional[Path],
@@ -412,10 +604,9 @@ def badge(
     Embed your measured verdict ("context rot | clean ✓") in a README or
     blog post without any badge service seeing your data.
     """
-    result = analyze(data_dir=data_dir, project_filter=project, days=days, window_override=window)
+    result = _analyze(data_dir, project, days, window)
     if not result.sessions:
-        console.print("[yellow]No sessions found.[/yellow]")
-        raise typer.Exit(code=1)
+        _no_sessions(days)
 
     from contextrot.report.badge import render_badge
 
@@ -429,6 +620,37 @@ def badge(
         raise typer.Exit(code=1) from e
     console.print(f"[green]Badge written:[/green] {out}")
     console.print(f"  Embed: ![context rot]({out.name})", markup=False)
+
+
+@app.command(rich_help_panel="Understand")
+def factors(
+    data_dir: DataDir = None,
+    project: ProjectF = None,
+    days: Days = 30,
+    window: Window = None,
+    as_json: Annotated[bool, typer.Option("--json", help="Machine-readable output.")] = False,
+) -> None:
+    """What actually moves your failure rate — beyond context fill.
+
+    The main report asks one question: does a fuller context make your agent
+    worse? Often the honest answer is no. This asks the broader one with the same
+    statistics — across time of day, how long the agent runs without you, how
+    many mistakes a session has already made, which model and which agent — what
+    separates your good steps from your bad ones?
+
+    Ranked strongest first. "Clear" means the two groups' confidence ranges don't
+    overlap; "maybe" means they do. It's association, not causation.
+    """
+    from contextrot.report.factors import render as render_factors
+
+    result = _analyze(data_dir, project, days, window, quiet=as_json)
+    if not result.steps:
+        _no_sessions(days)
+
+    if as_json:
+        print(json.dumps({"factors": [factor_dict(f) for f in result.factors]}, indent=2))
+        return
+    render_factors(result, console, animate=_animate())
 
 
 @app.command(rich_help_panel="Understand")
@@ -453,12 +675,9 @@ def waste(
     """
     from contextrot.signals import SIGNAL_NAMES
 
-    result = analyze(
-        data_dir=data_dir, project_filter=project, days=days, window_override=window
-    )
+    result = _analyze(data_dir, project, days, window, quiet=as_json)
     if not result.steps:
-        console.print("[yellow]No sessions found.[/yellow] Try a wider --days.")
-        raise typer.Exit(code=1)
+        _no_sessions(days)
 
     total = result.total_cost_usd
     rework = result.rework_cost_usd
@@ -505,16 +724,38 @@ def waste(
     )
     console.print()
 
-    table = Table(box=None, pad_edge=False, padding=(0, 2, 0, 0))
-    table.add_column("  What went wrong", style="cyan", no_wrap=True)
-    table.add_column("Steps", justify="right")
-    table.add_column("Cost", justify="right")
-    for name in SIGNAL_NAMES:
-        n = sum(1 for st in result.steps if getattr(st, name, False))
-        if not n:
-            continue
-        table.add_row(f"  {_SIGNAL_BLURB[name]}", f"{n:,}", f"${by_signal[name]:,.2f}")
-    console.print(table)
+    # Ranked by cost, with a bar: the point of this table is which failure costs
+    # most, and comparing five dollar figures by eye is work the bar can do.
+    signal_rows = sorted(
+        (
+            (name, sum(1 for st in result.steps if getattr(st, name, False)), by_signal[name])
+            for name in SIGNAL_NAMES
+        ),
+        key=lambda r: r[2],
+        reverse=True,
+    )
+    signal_rows = [r for r in signal_rows if r[1]]
+    worst = max((cost for _, _, cost in signal_rows), default=0.0)
+
+    def _table(rv):
+        table = Table(box=None, pad_edge=False, padding=(0, 2, 0, 0))
+        table.add_column("  What went wrong", style="cyan", no_wrap=True)
+        table.add_column("Steps", justify="right")
+        table.add_column("Cost", justify="right")
+        table.add_column("", min_width=14, max_width=14)
+        for i, (name, n, cost) in enumerate(signal_rows):
+            # Every row is present from the first frame and the bars cascade.
+            # Revealing whole rows instead would make the costliest failure the
+            # last thing to arrive, which is backwards.
+            table.add_row(
+                f"  {_SIGNAL_BLURB[name]}",
+                f"{n:,}",
+                f"${cost:,.2f}",
+                Text(anim.bar(cost, worst, 14, rv.stagger(i, len(signal_rows))), style="yellow"),
+            )
+        return table
+
+    anim.play(console, _table, animate=_animate())
     console.print(
         "  [dim]One step can trip several of these, so the rows overlap and "
         "don't sum to the total.[/dim]"
@@ -580,12 +821,9 @@ def water(
         _watch_water(data_dir)
         return
 
-    sessions, _skipped = load_sessions(
-        data_dir=data_dir, project_filter=project, days=days or None
-    )
+    sessions, _skipped = _load(data_dir, project, days or None, quiet=as_json)
     if not sessions:
-        console.print("[yellow]No sessions found.[/yellow] Try a wider --days.")
-        raise typer.Exit(code=1)
+        _no_sessions(days or None)
 
     totals = wtr.totals_for_sessions(sessions)
 
@@ -745,10 +983,9 @@ def trends(
     """
     from contextrot.analysis.trends import build_trend, trend_verdict
 
-    result = analyze(data_dir=data_dir, project_filter=None, days=days, window_override=window)
+    result = _analyze(data_dir, None, days, window)
     if not result.sessions:
-        console.print("[yellow]No sessions found.[/yellow]")
-        raise typer.Exit(code=1)
+        _no_sessions(days)
 
     trend = build_trend(result.steps, weeks=weeks)
     if not trend:
@@ -765,27 +1002,38 @@ def trends(
     console.print(f"[{style} bold]{text}[/]")
     console.print()
 
-    table = Table(title=f"Last {len(trend)} weeks")
-    table.add_column("Week of", style="cyan")
-    table.add_column("Steps", justify="right", style="dim")
-    table.add_column("Failure", justify="right")
-    table.add_column("95% CI", justify="right", style="dim")
-    table.add_column("Avg fill", justify="right")
-    table.add_column("Startup tokens", justify="right")
+    # A bar per week: this command exists to show direction, and direction is a
+    # shape, not six percentages you have to hold in your head.
+    peak = max((w.rate for w in trend), default=0.0)
 
-    for w in trend:
-        ci = f"{w.ci[0]:.0%}–{w.ci[1]:.0%}"
-        startup = f"{w.startup_tokens:,}" if w.startup_tokens is not None else "n/a"
-        thin = " [dim]*[/dim]" if w.steps < 30 else ""
-        table.add_row(
-            w.label,
-            f"{w.steps}{thin}",
-            f"{w.rate:.1%}",
-            ci,
-            f"{w.avg_fill:.0f}%",
-            startup,
-        )
-    console.print(table)
+    def _table(rv):
+        table = Table(title=f"Last {len(trend)} weeks")
+        table.add_column("Week of", style="cyan")
+        table.add_column("Steps", justify="right", style="dim")
+        table.add_column("Failure", justify="right")
+        table.add_column("", min_width=12, max_width=12)
+        table.add_column("95% CI", justify="right", style="dim")
+        table.add_column("Avg fill", justify="right")
+        table.add_column("Startup tokens", justify="right")
+
+        # Weeks are in time order, so the bars draw left-to-right through history
+        # and the trend's direction appears as it is drawn.
+        for i, w in enumerate(trend):
+            ci = f"{w.ci[0]:.0%}–{w.ci[1]:.0%}"
+            startup = f"{w.startup_tokens:,}" if w.startup_tokens is not None else "n/a"
+            thin = " [dim]*[/dim]" if w.steps < 30 else ""
+            table.add_row(
+                w.label,
+                f"{w.steps}{thin}",
+                f"{w.rate:.1%}",
+                Text(anim.bar(w.rate, peak, 12, rv.stagger(i, len(trend))), style="magenta"),
+                ci,
+                f"{w.avg_fill:.0f}%",
+                startup,
+            )
+        return table
+
+    anim.play(console, _table, animate=_animate())
     console.print("[dim]* fewer than 30 steps — too thin to weigh in the trend.[/dim]")
 
 
@@ -817,17 +1065,30 @@ def fix(
     claude_json = config or (Path.home() / ".claude.json")
     claude_md = Path.home() / ".claude" / "CLAUDE.md"
 
-    result = analyze(data_dir=data_dir, project_filter=None, days=days, window_override=window)
+    result = _analyze(data_dir, None, days, window)
     if not result.sessions:
-        console.print("[yellow]No sessions found.[/yellow] Nothing to prescribe.")
-        raise typer.Exit(code=1)
+        _no_sessions(days)
 
     # 1. The existing prescriptions, as-is.
     if result.prescriptions:
         console.print("[bold]Prescriptions from your data[/bold]")
-        for i, p in enumerate(result.prescriptions, 1):
-            console.print(f"  [yellow]{i}. {p.title}[/yellow]")
-            console.print(f"     {p.detail}")
+
+        def _advice(visible):
+            # Already ranked by impact, so the first one to arrive is the one
+            # worth doing first — arrival order is the ranking.
+            lines: list = []
+            for i, pres in enumerate(visible, 1):
+                head = Text(f"  {i}. {pres.title}", style="yellow")
+                lines.append(head)
+                lines.append(Text(f"     {pres.detail}"))
+            return Group(*lines)
+
+        anim.rows(
+            console,
+            _advice,
+            sorted(result.prescriptions, key=lambda x: x.priority),
+            animate=_animate(),
+        )
         console.print()
 
     # 2. CLAUDE.md size (report only — never auto-edited).
@@ -933,6 +1194,8 @@ def doctor(
     and whether the live surfaces are installed. Paths and counts only — it
     never prints your transcripts.
     """
+    import platform
+
     from contextrot.adapters import ADAPTERS
     from contextrot.analysis import analyze, load_sessions
     from contextrot.analysis.rot import VERDICT_MIN_N
@@ -940,28 +1203,49 @@ def doctor(
 
     console.print()
     console.rule("[bold]What contextrot can see[/bold]")
+    # Version and platform first: this output is what the bug template asks for,
+    # and "which version, on what" is the first question on every report.
+    console.print(
+        f"[dim]contextrot {__version__} · Python {platform.python_version()} · "
+        f"{platform.system()} {platform.release()}[/dim]"
+    )
     console.print()
 
     found_any = False
-    table = Table(show_edge=False, pad_edge=False)
-    table.add_column("Agent", style="cyan")
-    table.add_column("Transcripts", justify="right")
-    table.add_column("Where it looked", style="dim", overflow="fold")
+    probed: list[tuple[str, str, str]] = []
 
-    for name, adapter in ADAPTERS.items():
-        try:
-            paths = adapter.discover(data_dir)
-        except Exception as e:  # noqa: BLE001 — doctor must never crash
-            table.add_row(name, "[red]error[/red]", f"{type(e).__name__}: {e}")
-            continue
-        count = len({str(p) for p in paths})
-        where = str(paths[0].parent) if paths else _search_hint(name, data_dir)
-        if count:
-            found_any = True
-            table.add_row(name, f"[green]{count}[/green]", where)
-        else:
-            table.add_row(name, "[dim]none[/dim]", where)
-    console.print(table)
+    # Each probe is a filesystem walk, so this genuinely takes time. Showing which
+    # agent is being looked for as it is looked for is the honest version of what
+    # used to happen in silence before a finished table appeared.
+    with anim.Checklist(console, animate=_animate()) as checks:
+        for name, adapter in ADAPTERS.items():
+            checks.checking(f"looking for {name}")
+            try:
+                paths = adapter.discover(data_dir)
+            except Exception as e:  # noqa: BLE001 — doctor must never crash
+                probed.append((name, "[red]error[/red]", f"{type(e).__name__}: {e}"))
+                checks.resolved(Text(f"  ✗ {name}", style="red"))
+                continue
+            count = len({str(p) for p in paths})
+            where = str(paths[0].parent) if paths else _search_hint(name, data_dir)
+            if count:
+                found_any = True
+                probed.append((name, f"[green]{count}[/green]", where))
+                checks.resolved(Text(f"  ✓ {name} — {count} transcripts", style="green"))
+            else:
+                probed.append((name, "[dim]none[/dim]", where))
+                checks.resolved(Text(f"  · {name} — none", style="dim"))
+
+    def _table(visible):
+        table = Table(show_edge=False, pad_edge=False)
+        table.add_column("Agent", style="cyan")
+        table.add_column("Transcripts", justify="right")
+        table.add_column("Where it looked", style="dim", overflow="fold")
+        for name, count_cell, where in visible:
+            table.add_row(name, count_cell, where)
+        return table
+
+    anim.rows(console, _table, probed, animate=_animate())
     console.print()
 
     if not found_any:
@@ -1312,7 +1596,7 @@ def status(
     )
 
 
-@app.command(rich_help_panel="Watch it live")
+@app.command(rich_help_panel="Run by your agent, not by you")
 def statusline(
     segments: Annotated[
         Optional[str],
@@ -1327,7 +1611,7 @@ def statusline(
         typer.Option("--legend", help="Explain what every segment of the line means."),
     ] = False,
 ) -> None:
-    """Render a Claude Code statusline segment (reads session JSON from stdin).
+    """The Claude Code status line (Claude Code pipes session JSON to it).
 
     Wire it up with `contextrot install statusline` — Claude Code pipes live
     session JSON to this command and displays what it prints: current context
@@ -1374,9 +1658,9 @@ def statusline(
     )
 
 
-@app.command(rich_help_panel="Watch it live")
+@app.command(rich_help_panel="Run by your agent, not by you")
 def hook() -> None:
-    """Claude Code PostToolUse hook: warn once when a session crosses your knee.
+    """Warn once, inside Claude Code, when a session crosses your threshold.
 
     Wire it up with `contextrot install hook`. Reads hook JSON from stdin,
     checks the live transcript's context fill against your measured
@@ -1398,9 +1682,9 @@ def hook() -> None:
         print(json.dumps({"systemMessage": msg}))
 
 
-@app.command(rich_help_panel="Watch it live")
+@app.command(rich_help_panel="Run by your agent, not by you")
 def mcp() -> None:
-    """Serve contextrot as an MCP stdio server for any MCP-capable agent.
+    """Let an MCP-capable agent query your report mid-session (stdio server).
 
     Tools: rot_report, agents_ranking, prescriptions. Register with e.g.
     `claude mcp add contextrot -- contextrot mcp`. Local files only —

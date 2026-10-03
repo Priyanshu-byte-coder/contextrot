@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "contextrot"
-version = "1.8.0"
-description = "Find out where your coding agent starts degrading. Personal context-rot analytics from your own agent sessions."
+version = "2.0.0"
+description = "Does your coding agent get worse as its context fills? Measure it on your own sessions — and find what actually moves its failure rate."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
@@ -13,8 +13,12 @@ authors = [{ name = "Priyanshu Doshi" }]
 keywords = [
     "llm",
     "claude-code",
+    "codex",
+    "gemini-cli",
+    "coding-agents",
     "context-engineering",
     "context-rot",
+    "context-window",
     "agents",
     "developer-tools",
 ]
@@ -55,6 +59,13 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/contextrot"]
+
+# The source distribution is for building and testing the package, so it keeps
+# src/ and tests/ and drops what only the GitHub page needs. The README's images
+# use absolute URLs, so PyPI renders them without the files being in the sdist —
+# and the showcase media alone was most of a 7 MB download.
+[tool.hatch.build.targets.sdist]
+exclude = ["/assets", "/scripts", "/.github", "/npm"]
 
 [tool.ruff]
 line-length = 100

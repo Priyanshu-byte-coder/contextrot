@@ -4,6 +4,170 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [2.0.0] - 2026-10-04
+
+The question changes. contextrot used to start from the claim that agents get worse as
+their context fills, and set out to prove it on your sessions. On real work that claim
+often doesn't hold — and a tool that can only say "not that" leaves you with nothing. 2.0
+asks the open question instead, answers the broader one, and gives you a way to add your
+answer to everyone else's.
+
+### Added
+
+- **`contextrot factors` — what actually moves your failure rate.** The same statistics as
+  the verdict, across six axes: context fill, mistakes so far, time of day, steps since you
+  last spoke, model, and coding agent. Each comes back *clear* (non-overlapping confidence
+  ranges and a ratio of at least 1.3), *maybe*, or *no effect*, ranked strongest first, with
+  one thing to do about each clear one.
+
+  Ordered axes compare their two **ends** rather than their best and worst group. The
+  first version compared extremes, and on real data it flagged "2 earlier mistakes" against
+  "1" while "5+" sat right back at baseline — noise read as a trend. Two tempting axes were
+  rejected because they'd teach the wrong lesson: session length (bad sessions get
+  abandoned early, so short ones look worse — the arrow points backwards) and startup
+  overhead (dominated by which agent produced it). Both are written up in
+  `docs/methodology.md`.
+
+- **The short report names what *does* move your rate.** On a clean verdict, "filling the
+  window isn't what's hurting you" used to be a dead end. Now the strongest other clear
+  factor follows it: *"What does move it: it slips 1.7× as often at night as in the
+  morning."*
+
+- **`contextrot share` — your curve, anonymized, for a community dataset.** Prints a JSON
+  block of aggregate numbers — verdict, steps and failures per fill bucket, the snowball
+  table, factor comparisons, per-agent and per-model summaries — and **sends nothing**.
+  `--copy` puts it on your clipboard via the OS's own tool; you read it and paste it into a
+  GitHub issue yourself. No telemetry, and no data in the submit URL either.
+
+  Never in it: project names, paths, session ids, timestamps, prompts, code, dollar
+  figures, or model names from unknown vendors — a private fine-tune named after a company
+  would otherwise surface under the company's name, so only public vendors appear and the
+  rest pool as `other`. A test builds a corpus with a secret in its project name and paths,
+  confirms the secret reached the analysis, and walks every string in the payload to prove
+  it didn't leak. Counts are integers so curves can be pooled exactly. Schema in
+  `docs/sharing.md`.
+
+- **A "Share your curve" issue form** with one field: paste the block.
+
+- **`docs/guide.md`** — every command, the status line segment by segment, troubleshooting
+  and the FAQ, moved out of a README that had grown to 427 lines.
+
+### Changed
+
+- **Every command that parses now shows progress.** 1.9 gave the main report a progress bar
+  and left `projects`, `agents`, `badge`, `waste`, `trends` and `fix` parsing the same files
+  in silence.
+- **One empty-state message instead of ten.** Every "no sessions" now says what was
+  searched and the two fixes that work most often: `--days 0`, and `contextrot doctor`.
+- **`--help` is ordered for a newcomer**, with a "Start here" line. Commands Claude Code
+  runs on your behalf (`statusline`, `hook`, `mcp`) have their own panel, because nobody
+  types them.
+- **The short report ends with three next steps**, and the live one fits you: Claude Code
+  users without the status line are pointed at it, users of other agents at `status`, and
+  anyone already set up at `share`.
+- `doctor` prints the version, Python and OS first — it's what the bug template asks for.
+- "Knee" is gone from everything you read: the badge says `edge · from ~70% full`, and the
+  prescriptions say "threshold".
+- Model labels keep acronyms: `GPT 5.4`, not `Gpt 5.4`.
+- README rewritten around the question rather than the assumption, at about a third of its
+  length. Links are absolute, so it renders on PyPI as well as GitHub.
+- The source distribution drops the showcase images and maintainer scripts:
+  **7.1 MB → 228 KB**.
+
+### Fixed
+
+- **Showcase media could carry personal data.** Every image was a July screenshot of a UI
+  that no longer exists, and the `doctor` example quoted the maintainer's real calibration.
+  All twelve terminal screens are now generated from a synthetic corpus inside a sandboxed
+  home directory — an early capture leaked a username and three real MCP server names
+  through `fix`, which reads your home regardless of `--data-dir`. A test scans every
+  committed image for home-directory paths. 3.2 MB of stale PNGs removed.
+- The synthetic corpus produced 15–20% failure rates, because every read hit the same five
+  files and counted as a re-read. It now runs at about 4% at a fresh context, as real work
+  does.
+- A wrapped prescription line in the short report fell back to the margin instead of
+  staying under its title.
+
+## [1.9.0] - 2026-10-03
+
+Everything that draws a number now draws it arriving.
+
+### Added
+
+- **One animation engine, not fifteen animated renderers.** `contextrot.anim`
+  gives every renderer a `Reveal`, and a `Reveal` at `t = 1.0` reproduces the
+  finished frame exactly. Animating is calling the same function with `t`
+  climbing from zero; disabling it is passing `STATIC`. That buys the property
+  this whole release rests on: **with animation off, the output is byte-identical
+  to 1.8.0, because it is literally the same code at the same value.** There is a
+  test per command asserting it.
+
+- **Progress while transcripts are parsed.** The one genuinely slow step in the
+  tool — tens of thousands of steps across six adapters, about 1.6s on a real
+  machine — used to be seconds of nothing. Discovery is now split out from
+  parsing so the total is known before the first file is read, which is what
+  makes it a bar rather than a spinner. It names the agent being read and counts
+  sessions as they land, and vanishes when done.
+
+- **Bars grow, rows arrive, curves draw.** The rot curve's buckets fill in fill
+  order, so the curve builds along its own axis. The reversal table, the
+  composition breakdown and the comparison tables cascade. The headline
+  sparkline draws left to right. Every bar in the package now shares one
+  implementation (`anim.bar`) with an eighth-block leading edge, so a 12-cell bar
+  moves in 96 steps instead of 12.
+
+- **`doctor` resolves its checks as they complete.** Unlike everything else here
+  this is not an interpolation: probing six agents' data directories is six
+  filesystem walks that genuinely take time, and it happened in silence before a
+  finished table appeared.
+
+- **A share bar on `waste` and `trends`.** Both commands existed to compare
+  magnitudes and made you read five numbers to do it. `waste` is now ranked by
+  cost with a bar; `trends` draws a bar per week, so direction is a shape rather
+  than six percentages held in your head.
+
+- **The HTML report animates properly.** Chart bars grow from their own baseline
+  (horizontal bars grow sideways — a left-to-right bar that rises from the floor
+  reads as the wrong quantity), cards arrive as you scroll to them, and the hero
+  and tile figures count up. The count-up reads its target back out of the DOM
+  rather than being passed it separately, so the animation and the report cannot
+  disagree, and it leaves non-numeric verdicts ("none", "not enough data") alone.
+  Still one self-contained local file with zero network calls.
+
+- **`--animate/--no-animate`**, plus `CONTEXTROT_NO_ANIM=1`. Animation turns
+  itself off with no TTY, in CI, in Jupyter, and under `--json` — anywhere the
+  output is being read by a program rather than watched by a person. The HTML
+  report additionally honours `prefers-reduced-motion`.
+
+### Changed
+
+- `waste` rows are ordered by cost rather than by signal name. The point of the
+  table is which failure costs most.
+- Motion in the HTML report is gated behind a class that only JavaScript adds, so
+  a report opened with JavaScript off is a finished document rather than a blank
+  page. There is a test that walks the stylesheet and fails if any rule hides
+  content outside that gate.
+
+### Fixed
+
+- The animation driver slept a whole frame *after* rendering rather than the
+  remainder of the frame's budget, so every animation overran its requested
+  duration by the render cost — about 20% on a six-section report. A slow render
+  now drops frames instead of stretching the clock.
+
+### Notes
+
+- **The verdict is never animated.** It prints immediately, every time. Making
+  someone wait for the answer is the one thing an animation must not do.
+- **Prose does not count up.** These are sentences with figures inside them, and
+  a figure that changes width mid-count re-wraps the paragraph around it. Bars
+  and standalone totals animate; paragraphs do not.
+- **The SVG badge is deliberately not animated.** A badge is consumed as an
+  `<img>` by services that may rasterise the first frame, and a badge that can
+  render blank is a bad trade for a flourish. It would also be decoration rather
+  than an interpolation of a value, which is the bar every effect here has to
+  clear.
+
 ## [1.8.0] - 2026-10-02
 
 ### Added

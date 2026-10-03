@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from contextrot.cli import app
@@ -586,3 +587,61 @@ def test_install_statusline_rejects_an_unknown_segment(tmp_path: Path):
     assert result.exit_code == 2
     assert "Unknown segment" in result.output
     assert not settings.exists()
+
+
+# --- animation ----------------------------------------------------------------
+
+
+ANIMATED_COMMANDS = [
+    [],
+    ["--full"],
+    ["sessions"],
+    ["projects"],
+    ["agents"],
+    ["waste"],
+    ["trends"],
+    ["doctor"],
+    ["factors"],
+    ["share"],
+]
+
+
+@pytest.mark.parametrize(
+    "argv", ANIMATED_COMMANDS, ids=lambda a: " ".join(a) or "report"
+)
+def test_animation_never_changes_what_is_printed(argv, monkeypatch):
+    """The whole safety argument for the animation engine, enforced per command.
+
+    A disabled animation is the same render at t = 1.0, not a second code path —
+    so turning it off must be byte-identical, and a CliRunner (no TTY) must get
+    the finished frame whether or not --animate was passed.
+    """
+    monkeypatch.delenv("CI", raising=False)
+    base = [*argv, "--data-dir", str(FIXTURES), "--days", "0"]
+
+    monkeypatch.setenv("CONTEXTROT_NO_ANIM", "1")
+    off = runner.invoke(app, base, env={"NO_COLOR": "1"})
+    monkeypatch.delenv("CONTEXTROT_NO_ANIM")
+    on = runner.invoke(app, base, env={"NO_COLOR": "1"})
+
+    assert off.exit_code == on.exit_code
+    assert off.output == on.output
+
+
+def test_no_animate_flag_is_accepted_on_the_report():
+    result = runner.invoke(
+        app,
+        ["--no-animate", "--data-dir", str(FIXTURES), "--days", "0"],
+        env={"NO_COLOR": "1"},
+    )
+    assert result.exit_code == 0
+    assert "What to do" in result.output
+
+
+def test_json_output_carries_no_progress_or_animation():
+    """A machine-readable payload must stay parseable, bar or no bar."""
+    result = runner.invoke(
+        app, ["--json", "--data-dir", str(FIXTURES), "--days", "0"]
+    )
+    assert result.exit_code == 0
+    json.loads(result.output)

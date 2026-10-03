@@ -39,7 +39,7 @@ git clone https://github.com/Priyanshu-byte-coder/contextrot
 cd contextrot
 pip install -e ".[dev]"
 pytest
-ruff check src tests
+ruff check src tests scripts
 mypy src
 ```
 
@@ -58,19 +58,62 @@ This tool's credibility rests on not overclaiming. Reports must always carry n-c
 
 ## Regenerating the showcase media
 
-`SHOWCASE.md` promises that every figure in it comes from a synthetic dataset and that no real
-project name appears. Two scripts keep that true:
+Every terminal screen in `README.md` and `SHOWCASE.md` is generated, not photographed:
 
 ```bash
 python scripts/make_showcase_data.py --out .showcase-data
 python scripts/capture_showcase.py --data-dir .showcase-data
 ```
 
-The first writes a deterministic synthetic corpus — fixed seed, fixed timestamps, three fake
-projects, two agents, three models, with Opus degrading and Sonnet flat on the same work. The second
-re-renders the SVG assets straight from it via rich's SVG export, so no browser or headless renderer
-is needed.
+The first writes a deterministic synthetic corpus — fixed seed, three made-up projects, two
+agents, four models — shaped so each screen has something true to show: Opus degrading while
+the others stay flat, a late-night effect for `factors`, a four-week improvement for `trends`.
+The second runs each command against it and exports SVG through rich, so no browser is needed.
 
-The PNGs in `assets/showcase/` are still hand-captured terminal shots. If you change output that one
-of them shows, either retake it from the synthetic corpus or say in your PR that it is now stale —
-**never** capture showcase media from your own sessions, since project names and volumes leak.
+Run both from the repo root, with the relative `--data-dir` above. The capture runs every
+command inside a **sandboxed home directory** with a synthetic `~/.claude.json` and
+CLAUDE.md, because several commands read your home regardless of `--data-dir` — `fix` lists
+your MCP servers and project paths, `doctor` your calibration. An early version leaked a
+username and three real server names exactly that way; `tests/test_repo_hygiene.py` now scans
+every committed image for home-directory paths.
+
+Two images are still hand-captured: `report-html.png` (it needs a browser) and `hook.png`
+(Claude Code's own UI). If you change what one of those shows, retake it or say in your PR
+that it's stale — and **never** capture media from your own sessions.
+
+## Adding an animated renderer
+
+Do not write an animated version of a renderer beside the static one — they drift.
+Instead take a `Reveal` and let `t = 1.0` be the finished frame:
+
+```python
+from contextrot.anim import STATIC, Reveal, bar, play
+
+def _my_table(data, rv: Reveal = STATIC) -> Table:
+    table = Table()
+    for i, row in enumerate(data):
+        table.add_row(row.label, bar(row.value, peak, 14, rv.stagger(i, len(data))))
+    return table
+
+play(console, lambda rv: _my_table(data, rv), animate=animate)
+```
+
+`play` prints `build(STATIC)` and returns immediately when animation is off, so
+there is exactly one code path and disabling animation is provably a no-op. There
+is a test per command asserting the piped output is unchanged; add yours to
+`ANIMATED_COMMANDS` in `tests/test_cli.py`.
+
+The rules an effect has to clear:
+
+- **It interpolates a real value.** Bars grow to their height, counters count to
+  their total, rows arrive in rank order. No spinners next to numbers, nothing
+  pulsing or bouncing.
+- **It never delays the answer.** Verdicts and headlines print instantly.
+- **It leaves prose alone.** A figure that changes width mid-count re-wraps the
+  paragraph around it.
+- **It animates per section, not per screen.** `rich.Live` crops anything taller
+  than the terminal, so a whole report in one `Live` loses its bottom half on a
+  short window.
+
+Use `rv.stagger(i, n)` when every row is present from the first frame and their
+bars should cascade; use `anim.rows` when the rows themselves should arrive.

@@ -5,12 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from contextrot.adapters import ADAPTERS
+from contextrot.adapters import ADAPTERS, SessionAdapter
 from contextrot.analysis.by_model import ModelStats, build_model_comparison
 from contextrot.analysis.by_project import ProjectStats, build_project_comparison
 from contextrot.analysis.by_source import AgentStats, build_agent_comparison
 from contextrot.analysis.composition import Composition, estimate_composition
+from contextrot.analysis.factors import Factor, build_factors
 from contextrot.analysis.headroom import GrowthStats, turn_growth
 from contextrot.analysis.prescriptions import Prescription, prescribe
 from contextrot.analysis.rot import (
@@ -23,6 +25,9 @@ from contextrot.analysis.rot import (
 from contextrot.models import Session
 from contextrot.pricing import DEFAULT_CONTEXT_WINDOW, context_window_for
 from contextrot.signals import StepSignals, extract_signals
+
+if TYPE_CHECKING:  # import only for the annotation; anim pulls in rich.progress
+    from contextrot.anim import Parsing
 
 
 @dataclass
@@ -46,6 +51,8 @@ class AnalysisResult:
     models: list[ModelStats] = field(default_factory=list)
     projects: list[ProjectStats] = field(default_factory=list)
     agents: list[AgentStats] = field(default_factory=list)
+    # Every axis that moves the failure rate, ranked — see analysis.factors.
+    factors: list[Factor] = field(default_factory=list)
 
 
 def load_sessions(
@@ -53,14 +60,32 @@ def load_sessions(
     project_filter: str | None = None,
     days: int | None = None,
     min_steps: int = 3,
+    progress: Parsing | None = None,
 ) -> tuple[list[Session], int]:
-    """Discover and parse sessions across all adapters. Returns (sessions, skipped)."""
+    """Discover and parse sessions across all adapters. Returns (sessions, skipped).
+
+    ``progress`` is an optional reporter (see ``contextrot.anim.Parsing``) told how
+    many transcripts were found and then ticked once per file. This is the only
+    slow step in the tool — tens of thousands of steps across six adapters — and
+    it used to be seconds of silence. Discovery is split out from parsing so the
+    total is known before the first file is read, which is what makes the bar a
+    bar rather than a spinner.
+    """
     sessions: list[Session] = []
     skipped = 0
     cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
 
-    for adapter in ADAPTERS.values():
+    # Discover everything first: discovery only stat()s, so paying for it up front
+    # costs almost nothing and buys an honest denominator.
+    found: list[tuple[str, Path, SessionAdapter]] = []
+    for name, adapter in ADAPTERS.items():
         for path in adapter.discover(data_dir):
+            found.append((name, path, adapter))
+    if progress is not None:
+        progress.set_total(len(found))
+
+    for name, path, adapter in found:
+        try:
             if cutoff is not None:
                 try:
                     mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
@@ -86,6 +111,11 @@ def load_sessions(
             if project_filter and project_filter.lower() not in session.project.lower():
                 continue
             sessions.append(session)
+        finally:
+            # Ticked in a finally so a skipped or unparseable file still advances
+            # the bar; a progress bar that stalls on bad input looks like a hang.
+            if progress is not None:
+                progress.advance(agent=name, sessions=len(sessions))
 
     sessions.sort(key=lambda s: s.started_at or datetime.min.replace(tzinfo=timezone.utc))
     return sessions, skipped
@@ -120,8 +150,9 @@ def analyze(
     project_filter: str | None = None,
     days: int | None = 30,
     window_override: int | None = None,
+    progress: Parsing | None = None,
 ) -> AnalysisResult:
-    sessions, skipped = load_sessions(data_dir, project_filter, days)
+    sessions, skipped = load_sessions(data_dir, project_filter, days, progress=progress)
 
     all_steps: list[StepSignals] = []
     window = window_override or DEFAULT_CONTEXT_WINDOW
@@ -163,4 +194,5 @@ def analyze(
         models=build_model_comparison(all_steps),
         projects=build_project_comparison(all_steps),
         agents=build_agent_comparison(all_steps),
+        factors=build_factors(all_steps),
     )

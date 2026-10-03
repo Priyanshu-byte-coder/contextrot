@@ -1,43 +1,38 @@
 # contextrot
 
-Find out where **your** coding agent starts degrading — a personal context-rot
-report from the transcripts your agent CLI already writes to your disk. Runs
-fully local; nothing is uploaded.
+**Does your coding agent get worse as its context fills?** Find out on the sessions already
+on your disk — and what actually moves its failure rate. Runs fully local; nothing is
+uploaded.
 
 ```sh
 npx contextrot
 ```
 
-You get a short verdict: whether your agent degrades as context fills, what
-that's costing you, and the one thing worth changing.
+You get a short verdict: whether your agent degrades as context fills, the strongest other
+thing moving its failure rate, what the slips are costing you, and the one thing worth
+changing.
 
 ```
  ✓ NO MEASURABLE ROT
 
-  Your agent slips 3.3% of the time when the context is nearly full, against
-  4.0% when it's fresh. Filling the window is not what's hurting your output.
-
-  Measured on 28,617 steps from the last 30 days.
-  3.4% of your token spend went to steps that slipped — retries, failed edits
-  and re-reads that produced nothing.
+  Your agent slips 3.1% of the time when the context is nearly full, against 3.8% when
+  it's fresh. Filling the window is not what's hurting your output.
+  What does move it: it slips 1.7× as often at night (0–6h) as in the morning.
 ```
 
-A tool that can say "you're fine" is one you can trust when it says you're not
-— and about half of real reports come back clean.
+A tool that can say "you're fine" is one you can trust when it says you're not.
 
-## A few things to try
+## Then
 
 ```sh
-npx contextrot --full      # the curve, per-model comparison, context breakdown
-npx contextrot waste       # the share of your spend that produced nothing
-npx contextrot water       # litres of water your agents used, filling up on screen
-npx contextrot agents      # which of your CLIs holds up best on your work
-npx contextrot status      # one live line for tmux, Starship or your shell prompt
+npx contextrot factors     # what actually moves your failure rate
+npx contextrot --full      # the curve, comparisons, where your context goes
+npx contextrot status      # one live line for tmux, Starship or your prompt
+npx contextrot share       # your curve, anonymized, for the community dataset — sends nothing
 npx contextrot doctor      # what it can see, and why you have no verdict yet
 ```
 
-Reads Claude Code, Codex CLI, Gemini CLI, Qwen Code, OpenCode, and
-Cline/Roo/Kilo Code.
+Reads Claude Code, Codex CLI, Gemini CLI, Qwen Code, OpenCode, and Cline/Roo/Kilo Code.
 
 ## About this package
 
@@ -51,5 +46,4 @@ is found.
 Because it always resolves the latest PyPI release, this package is
 version-agnostic — you get current contextrot without updating anything here.
 
-Full documentation, methodology, and reports:
-**https://github.com/Priyanshu-byte-coder/contextrot**
+Full documentation: **https://github.com/Priyanshu-byte-coder/contextrot**

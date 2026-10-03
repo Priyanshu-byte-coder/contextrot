@@ -72,8 +72,14 @@ def _generic_family(s: str) -> str:
     return f"{name}-{digits.replace('-', '.')}"
 
 
+# Vendor names that are acronyms, so "gpt-5.4" reads "GPT 5.4" rather than
+# "Gpt 5.4" in every comparison table.
+_ACRONYMS = frozenset({"gpt", "glm", "o"})
+
+
 def model_label(family: str) -> str:
-    """Display label: "opus-4.8" -> "Opus 4.8"."""
+    """Display label: "opus-4.8" -> "Opus 4.8", "gpt-5.4" -> "GPT 5.4"."""
     parts = family.split("-", 1)
-    name = parts[0].capitalize()
+    head = parts[0]
+    name = head.upper() if head in _ACRONYMS else head.capitalize()
     return f"{name} {parts[1]}" if len(parts) > 1 else name

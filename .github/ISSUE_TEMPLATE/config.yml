@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
-  - name: 💬 Share your rot curve / ask a question
+  - name: 💬 Ask a question or share an idea
     url: https://github.com/Priyanshu-byte-coder/contextrot/discussions
-    about: Post results, questions, and ideas in Discussions — flat curves welcome too.
-  - name: 📖 Build an adapter (paved first PR)
+    about: Questions, ideas and show-and-tell. To add your curve to the dataset, use "Share your curve" above.
+  - name: 📖 Build an adapter for your agent CLI
     url: https://github.com/Priyanshu-byte-coder/contextrot/blob/main/CONTRIBUTING.md
-    about: Adding support for another agent CLI is one small file with a fixture and a test.
+    about: One small file with a sanitized fixture and a test — the paved first PR.

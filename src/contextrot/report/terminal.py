@@ -13,6 +13,8 @@ from rich.table import Table
 from rich.text import Text
 
 from contextrot.analysis import AnalysisResult, RotCurve
+from contextrot.anim import STATIC, Reveal, play
+from contextrot.anim import bar as anim_bar
 from contextrot.report._hero import (
     VERDICT_COLOR,
     VERDICT_ICON,
@@ -24,11 +26,11 @@ BAR_WIDTH = 40
 _SPARK = "▁▂▃▄▅▆▇█"
 
 
-def _bar(rate: float, max_rate: float, width: int = BAR_WIDTH) -> str:
-    if max_rate <= 0:
-        return ""
-    filled = min(width, round(width * rate / max_rate))
-    return "█" * filled
+def _bar(
+    rate: float, max_rate: float, width: int = BAR_WIDTH, rv: Reveal = STATIC
+) -> str:
+    """This report's bars. One shared implementation lives in ``anim.bar``."""
+    return anim_bar(rate, max_rate, width, rv)
 
 
 def _curve_max_rate(buckets: list) -> float:
@@ -40,17 +42,24 @@ def _curve_max_rate(buckets: list) -> float:
     return max((b.rate for b in trusted), default=0.0)
 
 
-def _sparkline(curve: RotCurve) -> str:
+def _sparkline(curve: RotCurve, rv: Reveal = STATIC) -> str:
+    """The slip curve as one line of blocks, drawn left to right.
+
+    Left to right is the axis's own direction — context filling up — so the draw
+    order is the data's order, and watching it build is watching the curve's
+    shape arrive rather than watching a wipe effect.
+    """
     max_rate = _curve_max_rate(curve.buckets)
     if max_rate <= 0:
         return ""
-    out = []
+    heights = []
     for b in curve.buckets:
         if b.n == 0:
             continue
         idx = min(int(min(b.rate, max_rate) / max_rate * (len(_SPARK) - 1)), len(_SPARK) - 1)
-        out.append(_SPARK[idx])
-    return "".join(out)
+        heights.append(_SPARK[idx])
+    drawn = len(heights) if rv.done else rv.whole(len(heights))
+    return "".join(heights[:drawn])
 
 
 def _hint(text: str) -> Text:
@@ -58,13 +67,25 @@ def _hint(text: str) -> Text:
     return Text(text, style="italic dim")
 
 
-def render(result: AnalysisResult, console: Console | None = None) -> None:
+def render(
+    result: AnalysisResult, console: Console | None = None, *, animate: bool = False
+) -> None:
+    """Print the full report.
+
+    Animated section by section rather than all at once: rich.Live crops anything
+    taller than the terminal, and a full report is taller than most. Each panel
+    grows where it is printed and stays in scrollback, so the report assembles
+    top-down instead of appearing — and on a short window nothing is lost.
+    """
     console = console or Console()
     curve = result.curve
     color = VERDICT_COLOR[result.verdict_kind]
 
+    def show(build) -> None:
+        play(console, build, animate=animate)
+
     console.print()
-    console.print(_headline(result))
+    show(lambda rv: _headline(result, rv))
     console.print()
 
     if curve.total_steps:
@@ -77,7 +98,7 @@ def render(result: AnalysisResult, console: Console | None = None) -> None:
             )
         )
         console.print()
-        console.print(_rot_curve_table(result))
+        show(lambda rv: _rot_curve_table(result, rv))
         console.print()
 
         console.rule("[bold]Do mistakes snowball?[/bold]", style=color)
@@ -89,7 +110,7 @@ def render(result: AnalysisResult, console: Console | None = None) -> None:
             )
         )
         console.print()
-        console.print(_reversal_curve_table(result))
+        show(lambda rv: _reversal_curve_table(result, rv))
         console.print()
 
     comparisons: list[tuple[str, str, list]] = [
@@ -105,12 +126,12 @@ def render(result: AnalysisResult, console: Console | None = None) -> None:
                 console.print(_hint(_COMPARISON_LEGEND))
                 console.print()
                 shown_any = True
-            console.print(_comparison_table(title, why, rows))
+            show(lambda rv, t=title, w=why, r=rows: _comparison_table(t, w, r, rv))
             console.print()
 
     console.rule("[bold]Where your context goes[/bold]", style=color)
     console.print()
-    console.print(_composition_panel(result))
+    show(lambda rv: _composition_panel(result, rv))
     console.print()
 
     if result.prescriptions:
@@ -150,7 +171,7 @@ def _zone_gloss(curve: RotCurve) -> str:
     )
 
 
-def _headline(result: AnalysisResult) -> Panel:
+def _headline(result: AnalysisResult, rv: Reveal = STATIC) -> Panel:
     curve = result.curve
     color = VERDICT_COLOR[result.verdict_kind]
     hero = hero_stat(result)
@@ -171,7 +192,7 @@ def _headline(result: AnalysisResult) -> Panel:
     t.append(hero["label"], style="dim")
     lines.append(t)
 
-    spark = _sparkline(curve)
+    spark = _sparkline(curve, rv)
     if spark:
         t = Text()
         t.append("  slip rate ", style="dim")
@@ -240,7 +261,7 @@ def _headline(result: AnalysisResult) -> Panel:
     )
 
 
-def _rot_curve_table(result: AnalysisResult) -> Table:
+def _rot_curve_table(result: AnalysisResult, rv: Reveal = STATIC) -> Table:
     curve = result.curve
     max_rate = _curve_max_rate(curve.buckets)
 
@@ -251,17 +272,17 @@ def _rot_curve_table(result: AnalysisResult) -> Table:
     table.add_column("steps", justify="right", style="dim")
     table.add_column("give-or-take", justify="right", style="dim")
 
-    for b in curve.buckets:
-        if b.n == 0:
-            continue
+    drawn = [b for b in curve.buckets if b.n]
+    for i, b in enumerate(drawn):
         lo_ci, hi_ci = b.ci
         past_knee = curve.knee_pct is not None and b.lo >= curve.knee_pct
         bar_style = "red" if past_knee else "green"
         rate_txt = f"{b.rate:.0%}" + ("*" if b.low_confidence else "")
+        # Buckets arrive in fill order, so the curve builds along its own axis.
         table.add_row(
             f"{b.lo}–{b.hi}%",
             rate_txt,
-            Text(_bar(b.rate, max_rate), style=bar_style),
+            Text(_bar(b.rate, max_rate, BAR_WIDTH, rv.stagger(i, len(drawn))), style=bar_style),
             str(b.n),
             f"{lo_ci:.0%}–{hi_ci:.0%}",
         )
@@ -276,7 +297,7 @@ def _rot_curve_table(result: AnalysisResult) -> Table:
     return table
 
 
-def _reversal_curve_table(result: AnalysisResult) -> Table:
+def _reversal_curve_table(result: AnalysisResult, rv: Reveal = STATIC) -> Table:
     curve = result.reversal_curve
     visible = [b for b in curve.buckets if b.n]
     max_rate = _curve_max_rate(curve.buckets)
@@ -288,13 +309,13 @@ def _reversal_curve_table(result: AnalysisResult) -> Table:
     table.add_column("steps", justify="right", style="dim")
     table.add_column("give-or-take", justify="right", style="dim")
 
-    for b in visible:
+    for i, b in enumerate(visible):
         lo_ci, hi_ci = b.ci
         rate_txt = f"{b.rate:.0%}" + ("*" if b.low_confidence else "")
         table.add_row(
             b.label,
             rate_txt,
-            Text(_bar(b.rate, max_rate), style="magenta"),
+            Text(_bar(b.rate, max_rate, BAR_WIDTH, rv.stagger(i, len(visible))), style="magenta"),
             str(b.n),
             f"{lo_ci:.0%}–{hi_ci:.0%}",
         )
@@ -318,7 +339,14 @@ def _snowball_takeaway(visible: list) -> str:
     return "→ No snowball here: past reversals don't raise the next step's slip rate."
 
 
-def _comparison_table(title: str, why: str, rows: list) -> Table:
+def _comparison_table(title: str, why: str, rows: list, rv: Reveal = STATIC) -> Table:
+    """A ranked comparison. Rows arrive in rank order, worst first.
+
+    No bars here to grow, so the reveal is arrival: the table is already sorted
+    worst-degrading first, so the row that lands first is the one that matters
+    most. Column widths come from the full row set, not the visible prefix, so
+    the table does not resize as rows appear.
+    """
     table = Table(title=f"{title} — [dim]{why}[/dim]", show_edge=False, pad_edge=False)
     table.add_column(title.replace("By ", "").replace("coding ", "").capitalize(), style="cyan")
     table.add_column("Steps", justify="right", style="dim")
@@ -331,7 +359,7 @@ def _comparison_table(title: str, why: str, rows: list) -> Table:
     def fmt_rate(r: float | None) -> str:
         return f"{r:.1%}" if r is not None else "n/a"
 
-    for item in rows:
+    for item in rv.visible(rows):
         c = item.curve
         ratio = c.degradation_ratio
         if ratio is None:
@@ -362,7 +390,7 @@ def _comparison_table(title: str, why: str, rows: list) -> Table:
     return table
 
 
-def _composition_panel(result: AnalysisResult) -> Panel:
+def _composition_panel(result: AnalysisResult, rv: Reveal = STATIC) -> Panel:
     comp = result.composition
     rows = [
         ("Startup overhead", comp.overhead_tokens,
@@ -379,10 +407,12 @@ def _composition_panel(result: AnalysisResult) -> Panel:
     table.add_column(justify="right")
     table.add_column(min_width=16, max_width=16)
     table.add_column(style="dim")
-    for label, tokens, note in rows:
+    for i, (label, tokens, note) in enumerate(rows):
+        local = rv.stagger(i, len(rows))
         share = tokens / biggest
-        bar = Text("█" * max(1, round(16 * share)), style="blue")
-        table.add_row(label, f"{tokens:,}", bar, note)
+        # Biggest first, so the bar you most need to see is the first to land.
+        bar = Text(_bar(share, 1.0, 16, local) or "", style="blue")
+        table.add_row(label, f"{local.whole(tokens):,}", bar, note)
     sub = Text(
         f"Averages per session (estimated). Startup overhead alone is "
         f"{comp.overhead_pct_of_window:.0f}% of your {comp.context_window:,}-token window — "

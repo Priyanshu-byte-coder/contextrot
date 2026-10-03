@@ -36,7 +36,7 @@ def badge_value(result: AnalysisResult) -> tuple[str, str]:
         return "clean ✓", color
     if kind == "edge":
         knee = result.curve.knee_pct
-        return (f"edge · knee ~{knee:.0f}%" if knee is not None else "edge rot"), color
+        return (f"edge · from ~{knee:.0f}% full" if knee is not None else "edge rot"), color
     if kind == "rot":
         ratio = result.curve.degradation_ratio
         if ratio is not None and ratio != float("inf"):

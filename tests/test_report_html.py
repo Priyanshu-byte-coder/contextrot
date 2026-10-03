@@ -165,3 +165,72 @@ def test_agent_section_present_with_two_agents(tmp_path: Path):
 def test_agent_section_absent_with_one_agent(tmp_path: Path):
     html = _render(_result(_mixed_steps()), tmp_path)
     assert "By agent" not in html
+
+
+# --- animation ----------------------------------------------------------------
+
+
+def _report(tmp_path) -> str:
+    from contextrot.analysis import analyze
+    from contextrot.report import render_html
+
+    fixtures = Path(__file__).parent / "fixtures"
+    result = analyze(data_dir=fixtures, days=0)
+    out = render_html(result, tmp_path / "r.html")
+    return out.read_text(encoding="utf-8")
+
+
+def test_motion_is_opt_in_so_a_no_js_report_is_still_readable(tmp_path):
+    """Every effect is gated behind .anim, which only JavaScript adds.
+
+    If the gate were the other way round — content hidden by default, revealed by
+    script — then a report opened with JavaScript off would be a blank page. This
+    is the single most important property of the HTML animation.
+    """
+    import re
+
+    doc = _report(tmp_path)
+    assert "classList.add('anim')" in doc
+
+    style = re.search(r"<style>(.*?)</style>", doc, re.S)
+    assert style, "no stylesheet"
+    css = style.group(1)
+    # Keyframes legitimately start from a hidden state; it is ordinary rules that
+    # must never hide anything unless the .anim gate is in their selector.
+    css = re.sub(r"@keyframes[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", "", css)
+
+    hiding = ("opacity: 0;", "scaleY(0)", "scaleX(0)")
+    for selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+        if any(h in body for h in hiding):
+            assert ".anim" in selector, f"hides content without the gate: {selector.strip()}"
+
+
+def test_reduced_motion_is_honoured(tmp_path):
+    doc = _report(tmp_path)
+    assert "prefers-reduced-motion: reduce" in doc
+
+
+def test_every_bar_carries_a_stagger_index(tmp_path):
+    """A bar without --i animates at delay 0, breaking the cascade."""
+    import re
+
+    doc = _report(tmp_path)
+    marks = re.findall(r'<rect class="mark[^"]*"([^>]*)', doc)
+    assert marks, "no chart bars found"
+    assert all("--i:" in m for m in marks)
+
+
+def test_horizontal_bars_grow_along_their_own_axis(tmp_path):
+    """A left-to-right bar that rises from the floor reads as the wrong quantity."""
+    doc = _report(tmp_path)
+    assert "mark across" in doc
+    assert "grow-across" in doc
+    assert "scaleX(0)" in doc
+
+
+def test_the_report_stays_self_contained(tmp_path):
+    """Animation must not have introduced a CDN. The tool makes zero network calls."""
+    import re
+
+    doc = _report(tmp_path)
+    assert not re.findall(r'(?:src|href)="https?://', doc)

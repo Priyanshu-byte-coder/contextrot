@@ -21,7 +21,7 @@ class _Result:
 def test_badge_value_per_verdict():
     assert badge_value(_Result("clean")) == ("clean ✓", "#2da44e")
     text, color = badge_value(_Result("edge", knee=70))
-    assert text == "edge · knee ~70%"
+    assert text == "edge · from ~70% full"
     assert color == "#d4a72c"
     text, color = badge_value(_Result("rot", ratio=3.24))
     assert text == "rot ✗ 3.2×"

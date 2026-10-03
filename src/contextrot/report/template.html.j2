@@ -102,6 +102,53 @@
     padding: .4rem .6rem; font-size: .8rem; color: var(--ink-1);
     box-shadow: 0 2px 8px rgba(0,0,0,.15);
   }
+
+  /* ---------------------------------------------------------------- motion
+     Everything here is gated behind .anim, which only JavaScript adds. With
+     JS off the report is simply finished and visible — an animation must never
+     be the reason content cannot be read. prefers-reduced-motion turns it all
+     off again for anyone who has asked the OS for that.
+
+     Each effect is an interpolation of a real value: bars grow to their own
+     height, numbers count to their own total, cards arrive in reading order.
+     Nothing pulses, spins or bounces. */
+  .anim .mark {
+    /* fill-box so the origin is the rect's own bottom edge, not the SVG's. */
+    transform-box: fill-box;
+    transform-origin: bottom;
+    animation: grow .85s cubic-bezier(.16, 1, .3, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 45ms);
+  }
+  @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+  /* The composition breakdown's bars run left to right, so they grow along
+     their own axis — a horizontal bar that rises from the floor reads as a
+     different quantity than the one it is. */
+  .anim .mark.across {
+    transform-origin: left;
+    animation-name: grow-across;
+  }
+  @keyframes grow-across { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  .anim .whisker, .anim .val {
+    animation: fade .5s ease-out backwards;
+    animation-delay: calc(var(--i, 0) * 45ms + .35s);
+  }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Cards arrive as they are scrolled to, so a long report reveals as you read
+     rather than animating a screenful you are not looking at yet. */
+  .anim .card, .anim .hero {
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity .5s ease-out, transform .5s cubic-bezier(.16, 1, .3, 1);
+  }
+  .anim .card.in, .anim .hero.in { opacity: 1; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .anim .mark, .anim .whisker, .anim .val { animation: none; }
+    .anim .card, .anim .hero { opacity: 1; transform: none; transition: none; }
+  }
 </style>
 </head>
 <body>
@@ -155,7 +202,8 @@
     <line x1="60" x2="840" y1="260" y2="260" stroke="var(--baseline)" stroke-width="1"/>
     {# bars #}
     {% for b in chart.bars %}
-    <rect class="mark" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="4"
+    <rect class="mark" style="--i:{{ loop.index0 }}"
+          x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="4"
           fill="{% if b.past_knee %}var(--critical){% else %}var(--series-1){% endif %}"
           {% if b.low_conf %}opacity="0.55"{% endif %}
           data-tip="{{ b.tip }}"/>
@@ -212,7 +260,8 @@
       <svg viewBox="0 0 280 125" width="100%" role="img" aria-label="Rot curve for {{ m.label }}">
         <line x1="10" x2="270" y1="100" y2="100" stroke="var(--baseline)" stroke-width="1"/>
         {% for b in m.mini.bars %}
-        <rect class="mark" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"
+        <rect class="mark" style="--i:{{ loop.index0 }}"
+              x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"
               fill="{% if b.past_knee %}var(--critical){% else %}var(--series-1){% endif %}"
               {% if b.low_conf %}opacity="0.55"{% endif %}
               data-tip="{{ m.label }} — {{ b.tip }}"/>
@@ -250,7 +299,8 @@
       <svg viewBox="0 0 280 125" width="100%" role="img" aria-label="Rot curve for {{ p.label }}">
         <line x1="10" x2="270" y1="100" y2="100" stroke="var(--baseline)" stroke-width="1"/>
         {% for b in p.mini.bars %}
-        <rect class="mark" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"
+        <rect class="mark" style="--i:{{ loop.index0 }}"
+              x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"
               fill="{% if b.past_knee %}var(--critical){% else %}var(--series-1){% endif %}"
               {% if b.low_conf %}opacity="0.55"{% endif %}
               data-tip="{{ p.label }} — {{ b.tip }}"/>
@@ -288,7 +338,8 @@
       <svg viewBox="0 0 280 125" width="100%" role="img" aria-label="Rot curve for {{ a.label }}">
         <line x1="10" x2="270" y1="100" y2="100" stroke="var(--baseline)" stroke-width="1"/>
         {% for b in a.mini.bars %}
-        <rect class="mark" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"
+        <rect class="mark" style="--i:{{ loop.index0 }}"
+              x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"
               fill="{% if b.past_knee %}var(--critical){% else %}var(--series-1){% endif %}"
               {% if b.low_conf %}opacity="0.55"{% endif %}
               data-tip="{{ a.label }} — {{ b.tip }}"/>
@@ -309,7 +360,7 @@
   <svg viewBox="0 0 860 {{ comp.height }}" width="100%" role="img" aria-label="Horizontal bar chart of estimated context composition">
     {% for r in comp.rows %}
     <text x="0" y="{{ r.y + 13 }}" class="val" text-anchor="start">{{ r.label }}</text>
-    <rect class="mark" x="200" y="{{ r.y }}" width="{{ r.w }}" height="18" rx="4" fill="{{ r.color }}" data-tip="{{ r.tip }}"/>
+    <rect class="mark across" style="--i:{{ loop.index0 }}" x="200" y="{{ r.y }}" width="{{ r.w }}" height="18" rx="4" fill="{{ r.color }}" data-tip="{{ r.tip }}"/>
     <text x="{{ 208 + r.w }}" y="{{ r.y + 13 }}" text-anchor="start">{{ r.val }}</text>
     {% endfor %}
   </svg>
@@ -442,6 +493,79 @@ Generated by contextrot v{{ meta.version }}.</p>
   }
   document.getElementById('save-png').addEventListener('click', savePNG);
   document.getElementById('save-svg').addEventListener('click', saveSVG);
+})();
+</script>
+<script>
+/* Motion, added only when JavaScript is running so the no-JS report is a
+   finished document rather than a blank one. Three effects, no dependencies,
+   no network — the same promise as the rest of the tool. */
+(function () {
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.documentElement.classList.add('anim');
+
+  /* Cards arrive as they scroll into view. Without IntersectionObserver every
+     card is simply marked visible, which is also what reduced motion gets. */
+  var blocks = document.querySelectorAll('.card, .hero');
+  if (reduce || !('IntersectionObserver' in window)) {
+    blocks.forEach(function (el) { el.classList.add('in'); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+    blocks.forEach(function (el) { io.observe(el); });
+  }
+
+  /* Count-up. The numbers are already rendered as final text, so the digits are
+     read back out of the DOM rather than passed in separately: there is then no
+     way for the animation and the report to disagree, and the finished value is
+     always what was written. Prefix and suffix ("~", "%", "x", "$") are kept, and
+     the decimal count and grouping are copied from the text so "1,240" does not
+     animate through "1240". */
+  function countUp(el) {
+    var m = /^(\D*?)([\d,]+(?:\.\d+)?)([\s\S]*)$/.exec(el.textContent.trim());
+    if (!m) return;
+    var head = m[1], digits = m[2], tail = m[3];
+    var grouped = digits.indexOf(',') >= 0;
+    var dot = digits.indexOf('.');
+    var places = dot < 0 ? 0 : digits.length - dot - 1;
+    var target = parseFloat(digits.replace(/,/g, ''));
+    if (!isFinite(target)) return;
+
+    var shown = function (v) {
+      var out = v.toFixed(places);
+      if (grouped) {
+        var parts = out.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        out = parts.join('.');
+      }
+      return head + out + tail;
+    };
+
+    var started = null, ms = 900;
+    function frame(now) {
+      if (started === null) started = now;
+      var t = Math.min(1, (now - started) / ms);
+      el.textContent = shown(target * (1 - Math.pow(1 - t, 3)));
+      if (t < 1) requestAnimationFrame(frame); else el.textContent = shown(target);
+    }
+    el.textContent = shown(0);
+    requestAnimationFrame(frame);
+  }
+
+  var numbers = document.querySelectorAll('.hero-num, .tile .v');
+  if (reduce || !window.requestAnimationFrame) return;
+  if (!('IntersectionObserver' in window)) {
+    numbers.forEach(countUp);
+    return;
+  }
+  var nio = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { countUp(e.target); nio.unobserve(e.target); }
+    });
+  }, { threshold: 0.5 });
+  numbers.forEach(function (el) { nio.observe(el); });
 })();
 </script>
 </body>

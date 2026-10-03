@@ -94,6 +94,11 @@ class StepSignals:
     reversals_so_far: int = 0
     reversal: bool = False
     cost_usd: float = 0.0
+    # Steps since the user last said something: 0 is the agent's first move
+    # after a prompt, 12 is twelve steps into an unsupervised run. None when the
+    # adapter recorded no turn boundaries for this session, because counting from
+    # session start would silently mislabel every step as a long autonomous run.
+    steps_since_prompt: int | None = None
 
     @property
     def degraded(self) -> bool:
@@ -117,6 +122,7 @@ class StepSignals:
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             **{name: getattr(self, name) for name in SIGNAL_NAMES},
             "reversals_so_far": self.reversals_so_far,
+            "steps_since_prompt": self.steps_since_prompt,
             "reversal": self.reversal,
             "degraded": self.degraded,
             "cost_usd": round(self.cost_usd, 6),
@@ -138,8 +144,13 @@ def extract_signals(session: Session, context_window: int) -> SessionSignals:
     files_read: set[str] = set()
     edited_targets: set[str] = set()
     reversals_so_far = 0
+    # Autonomy depth needs turn boundaries. A session with none marked gets None
+    # rather than a count from the first step — see StepSignals.steps_since_prompt.
+    turn_marked = any(st.starts_turn for st in session.steps)
+    since_prompt = 0
 
     for i, step in enumerate(session.steps):
+        since_prompt = 0 if step.starts_turn else since_prompt + 1
         sig = StepSignals(
             step_index=i,
             prompt_tokens=step.prompt_tokens,
@@ -149,6 +160,7 @@ def extract_signals(session: Session, context_window: int) -> SessionSignals:
             source=session.source,
             timestamp=step.timestamp,
             reversals_so_far=reversals_so_far,
+            steps_since_prompt=since_prompt if turn_marked else None,
             cost_usd=step_cost_usd(
                 step.input_tokens,
                 step.cache_creation_tokens,

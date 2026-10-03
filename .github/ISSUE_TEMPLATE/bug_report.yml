@@ -1,19 +1,22 @@
 name: Bug report
-description: Something broke or produced wrong output
+description: Something broke, or the numbers look wrong
 labels: [bug]
 body:
-  - type: input
-    id: version
+  - type: textarea
+    id: what
     attributes:
-      label: contextrot version
-      placeholder: "0.1.0 (contextrot --version)"
+      label: What happened
+      description: The command you ran, what you expected, and what you got. Paste tracebacks in full.
     validations:
       required: true
-  - type: input
-    id: agent
+  - type: textarea
+    id: doctor
     attributes:
-      label: Agent CLI and version
-      placeholder: "Claude Code 2.1.92"
+      label: Output of `contextrot doctor`
+      description: >
+        Shows your version, which agents were found and where contextrot looked. It answers
+        most "why don't I have a verdict" questions on its own, so please run it first.
+      render: text
     validations:
       required: true
   - type: input
@@ -22,17 +25,9 @@ body:
       label: OS
       placeholder: "Windows 11 / macOS 15 / Ubuntu 24.04"
   - type: textarea
-    id: what
-    attributes:
-      label: What happened
-      description: Command you ran, what you expected, what you got. Paste tracebacks in full.
-    validations:
-      required: true
-  - type: textarea
     id: transcript
     attributes:
       label: Sanitized transcript snippet (parsing bugs only)
       description: >
-        If parsing failed, paste the offending JSONL line(s) with file paths,
-        code, and personal data replaced by placeholders. Never paste raw
-        transcript content.
+        If parsing failed, paste the offending JSONL line(s) with file paths, code and personal
+        data replaced by placeholders. Never paste raw transcript content.

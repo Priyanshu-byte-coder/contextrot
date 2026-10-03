@@ -41,7 +41,7 @@ def prescribe(
                 ),
                 impact=(
                     f"Estimated ${rework_cost_usd:.2f} of recent spend went to degraded "
-                    "steps and their retries; most of it is concentrated past the knee."
+                    "steps and their retries; most of it is concentrated past that threshold."
                 ),
                 priority=1,
             )
