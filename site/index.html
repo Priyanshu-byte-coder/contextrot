@@ -3,434 +3,224 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>contextrot — does your agent rot as its context fills?</title>
-  <meta name="description" content="Everyone says coding agents get worse as their context fills. contextrot checks that claim against the sessions already on your disk — and finds what actually moves your failure rate. Open source, zero network calls.">
+  <title>contextrot — does your AI agent get worse as its context fills?</title>
+  <meta name="description" content="contextrot reads your coding agent's logs and tells you whether it gets worse as its context window fills — and what actually moves its failure rate. Free, open source, runs on your machine.">
   <meta name="theme-color" content="#05060a">
   <meta name="color-scheme" content="dark">
   <link rel="icon" href="img/mark.svg" type="image/svg+xml">
   <link rel="canonical" href="https://priyanshu-byte-coder.github.io/contextrot/">
-
   <meta property="og:type" content="website">
-  <meta property="og:title" content="contextrot — does your agent rot as its context fills?">
-  <meta property="og:description" content="Check the folklore against your own sessions. Open source, local, zero network calls.">
+  <meta property="og:title" content="contextrot — does your AI agent get worse as its context fills?">
+  <meta property="og:description" content="Find out from the sessions already on your disk. Free, open source, zero network calls.">
   <meta property="og:url" content="https://priyanshu-byte-coder.github.io/contextrot/">
   <meta property="og:image" content="https://priyanshu-byte-coder.github.io/contextrot/img/og.jpg">
   <meta name="twitter:card" content="summary_large_image">
-
-  <link rel="preload" href="fonts/instrument-serif-400.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="fonts/instrument-serif-400-italic.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="fonts/jetbrains-mono-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/departure-mono.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/bricolage-grotesque-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/main.js"></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
 
-  <!-- ─── stage ─────────────────────────────────────────────── -->
   <canvas id="field" aria-hidden="true"></canvas>
-  <div class="grain" aria-hidden="true"></div>
-  <div class="cursor" aria-hidden="true"><span class="cursor-dot"></span><span class="cursor-ring"></span></div>
-
-  <!-- ─── loader ────────────────────────────────────────────── -->
-  <div class="loader" aria-hidden="true">
-    <div class="loader-inner">
-      <span class="loader-label mono">loading context</span>
-      <span class="loader-num" data-loader-num>0</span>
-      <span class="loader-bar"><i></i></span>
+  <!-- the window's frame: follows the field's rect every frame -->
+  <div class="frame" aria-hidden="true">
+    <div class="frame-bar">
+      <span class="frame-dots"><i></i><i></i><i></i></span>
+      <span class="frame-title">context window</span>
+      <span class="frame-pct"><b data-frame-pct>0</b>%</span>
+    </div>
+    <div class="frame-body">
+      <svg class="frame-chart" viewBox="0 0 640 380" preserveAspectRatio="none">
+        <path class="fc-line" d=""></path>
+      </svg>
+      <div class="frame-labels">
+        <span class="fl fl-fresh"><b>3.8%</b> fresh</span>
+        <span class="fl fl-deep"><b>3.1%</b> deep</span>
+      </div>
     </div>
   </div>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="cursor" aria-hidden="true"><span class="cursor-dot"></span><span class="cursor-ring"><span class="cursor-label"></span></span></div>
 
-  <!-- ─── nav ───────────────────────────────────────────────── -->
+  <div class="loader" aria-hidden="true">
+    <div class="loader-num"><span data-loader-num>0</span>%</div>
+    <div class="loader-bar"><i></i></div>
+    <div class="loader-label">loading context</div>
+  </div>
+
   <header class="nav">
-    <a class="brand" href="#top" aria-label="contextrot — back to top">
-      <img src="img/mark.svg" alt="" width="26" height="26">
-      <span class="brand-word">context<span class="rot-word">rot</span></span>
+    <a class="brand" href="#top" aria-label="contextrot, back to top">
+      <img src="img/mark.svg" alt="" width="24" height="24">
+      <span>contextrot</span>
     </a>
-    <nav class="nav-links" aria-label="Sections">
-      <a href="#signals">Method</a>
-      <a href="#answer">Finding</a>
-      <a href="#factors">Factors</a>
-      <a href="#demo">Demo</a>
-      <a href="#share">Share</a>
-    </nav>
-    <div class="nav-right">
-      <div class="nav-meter mono" aria-hidden="true">
-        <span class="nm-label">ctx</span>
-        <span class="nm-pct" data-meter-pct>0%</span>
-        <span class="nm-bar"><i data-meter-bar></i></span>
-      </div>
-      <a class="btn-gh" href="https://github.com/Priyanshu-byte-coder/contextrot" data-magnetic>
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-        <span>Star on GitHub</span>
-      </a>
+    <div class="chapter" aria-hidden="true">
+      <span class="ch-num" data-ch-num>00</span>
+      <span class="ch-bar"><i data-ch-bar></i></span>
+      <span class="ch-title" data-ch-title>start</span>
     </div>
+    <a class="gh" href="https://github.com/Priyanshu-byte-coder/contextrot" data-magnetic>
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.290 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.490-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.330.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      <span>GitHub</span>
+    </a>
   </header>
 
   <main id="main">
 
-    <!-- ─── 00 hero ─────────────────────────────────────────── -->
-    <section class="hero" id="top">
-      <div class="hero-scrim" aria-hidden="true"></div>
-      <div class="wrap hero-inner">
-        <p class="kicker mono" data-scramble>open source · v2.0 · runs on your machine</p>
-        <h1 class="hero-title" data-split>
-          Does your agent <em class="rot-em" data-rot>rot</em><br>as its context fills?
-        </h1>
-        <p class="hero-sub" data-reveal>
-          Everyone says coding agents get worse as the window fills. <strong>contextrot</strong>
-          checks that claim against the sessions already on your disk — and finds what
-          actually moves your failure rate.
-        </p>
+    <!-- 00 · hero -->
+    <section class="hero" id="top" data-chapter="00" data-title="start">
+      <div class="hero-copy">
+        <p class="eyebrow">free · open source · runs on your machine</p>
+        <h1 class="h-hero" data-split>Does your AI agent get <em>worse</em> as its context fills?</h1>
+        <p class="hero-sub" data-reveal>contextrot reads your agent's logs and tells you.</p>
         <div class="hero-cta" data-reveal>
-          <button class="cmd" data-copy="uvx contextrot" data-magnetic aria-label="Copy the command uvx contextrot">
-            <span class="cmd-prompt">$</span>
-            <span class="cmd-text">uvx contextrot</span>
-            <span class="cmd-copy" aria-hidden="true"><span class="cc-idle">copy</span><span class="cc-done">copied</span></span>
+          <button class="cmd" data-copy="uvx contextrot" data-magnetic aria-label="Copy: uvx contextrot">
+            <span class="cmd-p">$</span> uvx contextrot <span class="cmd-c"><span class="c1">copy</span><span class="c2">copied</span></span>
           </button>
-          <a class="link-arrow" href="#window">How it works <span aria-hidden="true">↓</span></a>
+          <a class="ghost" href="#window">the story ↓</a>
         </div>
-        <ul class="hero-meta mono" data-reveal>
-          <li><i class="dot dot-blue"></i>zero network calls</li>
-          <li><i class="dot dot-violet"></i>no API keys</li>
-          <li><i class="dot dot-red"></i>8 agent CLIs</li>
-        </ul>
       </div>
-      <div class="hero-hint mono" aria-hidden="true">
-        <span>move your cursor through the rot</span>
-        <span class="hint-line"><i></i></span>
-        <span>scroll to fill the window</span>
+      <p class="hero-note" aria-hidden="true">← this is a context window. hover it.</p>
+    </section>
+
+    <!-- 01 · the window fills (vertical, pinned) -->
+    <section class="pin pin-window" id="window" data-chapter="01" data-title="the window" data-pin="window">
+      <div class="pin-stage">
+        <div class="lines">
+          <p class="line" data-l="0"><span class="tag">01</span>Everything your agent sees goes in here.</p>
+          <p class="line" data-l="1"><span class="tag">01</span>Files. Messages. Tools.<br>It <em>fills.</em></p>
+          <p class="line" data-l="2"><span class="tag">01</span>Past 60%, they say,<br>it starts to <em class="red">rot.</em></p>
+        </div>
       </div>
     </section>
 
-    <!-- ─── 01 the window (scroll scene) ────────────────────── -->
-    <section class="scene scene-window" id="window" data-scene="window" aria-label="The context window">
-      <div class="sticky">
-        <div class="wrap window-grid">
-          <div class="window-steps">
-            <div class="wstep" data-step="0">
-              <p class="kicker mono">01 · the window</p>
-              <h2 class="display">Every step, your agent rereads <em>everything</em> so far.</h2>
-              <p class="lede">Every file it opened, every tool result, every message — replayed on each turn. That's the context window.</p>
-            </div>
-            <div class="wstep" data-step="1">
-              <p class="kicker mono">01 · the window</p>
-              <h2 class="display">It fills. <em>Fast.</em></h2>
-              <p class="lede">A long session passes hundreds of thousands of tokens. Most of it is history.</p>
-            </div>
-            <div class="wstep" data-step="2">
-              <p class="kicker mono">01 · the folklore</p>
-              <h2 class="display">Past <em>~60%</em>, the advice goes, it starts to rot.</h2>
-              <p class="lede"><code>/clear</code> often. Keep it small. Split work into subagents. Compact early.</p>
-            </div>
-            <div class="wstep" data-step="3">
-              <p class="kicker mono">01 · the source</p>
-              <h2 class="display">That advice comes from <em>lab benchmarks.</em></h2>
-              <p class="lede">Needle-in-a-haystack. Synthetic retrieval. Good studies — but not your repo, not your prompts, not your work.</p>
-            </div>
-            <div class="wstep" data-step="4">
-              <p class="kicker mono">01 · the gap</p>
-              <h2 class="display">Nobody had checked it on <em>real sessions.</em></h2>
-              <p class="lede">The data was on your disk the whole time. Every agent CLI logs every step — token counts, tool calls, errors.</p>
-            </div>
+    <!-- 02 · the signals (horizontal, moving left) -->
+    <section class="hs" id="signals" data-chapter="02" data-title="what we count" data-hs="left">
+      <div class="hs-stage">
+        <div class="hs-track">
+          <div class="panel panel-intro">
+            <p class="tag">02</p>
+            <h2 class="h-big">So we counted<br>every <em>slip.</em></h2>
+            <p class="hint">scroll →</p>
           </div>
-          <div class="window-hud" aria-hidden="true">
-            <div class="hud-pct"><span data-hud-pct>0</span><sup>%</sup></div>
-            <div class="hud-label mono">context window</div>
-            <div class="hud-line mono">
-              <span>ctx</span>
-              <span class="hud-bar"><i data-hud-bar></i></span>
-              <span data-hud-tokens>0k/1M</span>
-            </div>
-            <div class="hud-state mono" data-hud-state>fresh</div>
-          </div>
-        </div>
-        <div class="scene-progress" aria-hidden="true"><i data-scene-progress="window"></i></div>
-      </div>
-    </section>
-
-    <!-- ─── 02 signals ──────────────────────────────────────── -->
-    <section class="section signals" id="signals">
-      <div class="wrap">
-        <header class="section-head">
-          <p class="kicker mono" data-scramble>02 · how it measures</p>
-          <h2 class="display" data-split>Five ways an agent <em>slips.</em></h2>
-          <p class="lede" data-reveal>
-            For every step in every session, contextrot records how full the window was — and
-            whether one of five things went wrong. Then it asks one question: does the rate
-            climb as the window fills?
-          </p>
-        </header>
-        <div class="signal-grid">
-          <article class="signal" data-reveal data-signal="edit">
-            <canvas class="signal-canvas" aria-hidden="true"></canvas>
-            <div class="signal-body">
-              <p class="signal-key mono">edit_failure</p>
-              <h3>The edit didn't apply</h3>
-              <p>It aimed a change at text that isn't there — wrong line, stale copy, invented context.</p>
-            </div>
-          </article>
-          <article class="signal" data-reveal data-signal="retry">
-            <canvas class="signal-canvas" aria-hidden="true"></canvas>
-            <div class="signal-body">
-              <p class="signal-key mono">retry</p>
-              <h3>Same call, again</h3>
-              <p>An identical tool call right after the last one. It didn't learn from the answer.</p>
-            </div>
-          </article>
-          <article class="signal" data-reveal data-signal="reread">
-            <canvas class="signal-canvas" aria-hidden="true"></canvas>
-            <div class="signal-body">
-              <p class="signal-key mono">reread</p>
-              <h3>Reading what it already has</h3>
-              <p>Opening a file that's still in context, unchanged. Lost track of its own window.</p>
-            </div>
-          </article>
-          <article class="signal" data-reveal data-signal="error">
-            <canvas class="signal-canvas" aria-hidden="true"></canvas>
-            <div class="signal-body">
-              <p class="signal-key mono">tool_error</p>
-              <h3>The tool said no</h3>
-              <p>A command that failed, a path that doesn't exist, arguments that don't parse.</p>
-            </div>
-          </article>
-          <article class="signal" data-reveal data-signal="sorry">
-            <canvas class="signal-canvas" aria-hidden="true"></canvas>
-            <div class="signal-body">
-              <p class="signal-key mono">self_correction</p>
-              <h3>"I apologize, let me fix that"</h3>
-              <p>The agent noticing, in its own words, that the last thing it did was wrong.</p>
-            </div>
-          </article>
-          <article class="signal signal-stat" data-reveal>
-            <div class="stat-inner">
-              <p class="kicker mono">and the statistics</p>
-              <p class="stat-big"><span data-count="95">0</span><sup>%</sup></p>
-              <p>Wilson confidence intervals on every rate. A threshold is declared only when the
-              evidence clears the baseline — one noisy bucket can't scare you.</p>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <!-- ─── 03 the answer (scroll scene) ────────────────────── -->
-    <section class="scene scene-answer" id="answer" data-scene="answer" aria-label="The finding">
-      <div class="sticky">
-        <div class="wrap answer-stack">
-          <p class="answer-line" data-aline="0"><span class="kicker mono">03 · the finding</span>We built a tool to find context rot.</p>
-          <p class="answer-line" data-aline="1">Then ran it on <span class="num" data-answer-count>31,991</span> real steps.</p>
-          <p class="answer-line answer-big" data-aline="2">It isn't <em>there.</em></p>
-          <p class="answer-foot mono" data-aline="3">fresh context 3.8% slips · deep context 3.1% · no measurable rot</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ─── 04 the curve ────────────────────────────────────── -->
-    <section class="section curve-section" id="curve">
-      <div class="wrap">
-        <header class="section-head">
-          <p class="kicker mono" data-scramble>04 · the curve</p>
-          <h2 class="display" data-split>Yours could look like <em>any</em> of these.</h2>
-          <p class="lede" data-reveal>
-            One developer's curve isn't a law. contextrot gives you one of four honest answers —
-            and a tool that can say <em>"you're fine"</em> is one you can trust when it says you're not.
-          </p>
-        </header>
-
-        <div class="curve-card" data-reveal>
-          <div class="curve-tabs" role="tablist" aria-label="Verdicts">
-            <button role="tab" class="ctab" data-verdict="clean" aria-selected="true"><i class="mark mark-clean">✓</i>No measurable rot</button>
-            <button role="tab" class="ctab" data-verdict="rot" aria-selected="false"><i class="mark mark-rot">✗</i>Context rot</button>
-            <button role="tab" class="ctab" data-verdict="edge" aria-selected="false"><i class="mark mark-edge">!</i>Edge rot</button>
-            <button role="tab" class="ctab" data-verdict="insufficient" aria-selected="false"><i class="mark mark-ins">?</i>Not enough data</button>
-          </div>
-          <div class="curve-body">
-            <div class="curve-figure">
-              <div class="curve-scroll"><svg class="curve-svg" viewBox="0 0 1000 460" role="img" aria-label="Failure rate by context fill"></svg></div>
-              <div class="curve-tip mono" aria-hidden="true"></div>
-            </div>
-            <aside class="curve-side">
-              <p class="curve-source mono" data-curve-source></p>
-              <h3 class="curve-verdict" data-curve-title></h3>
-              <p class="curve-desc" data-curve-desc></p>
-              <dl class="curve-stats">
-                <div><dt class="mono">fresh &lt;40%</dt><dd data-curve-fresh>–</dd></div>
-                <div><dt class="mono">deep &gt;60%</dt><dd data-curve-deep>–</dd></div>
-                <div><dt class="mono">ratio</dt><dd data-curve-ratio>–</dd></div>
-              </dl>
-              <p class="curve-note mono">bands = 95% Wilson intervals · dots sized by steps</p>
-            </aside>
+          <figure class="panel sig" data-signal="edit"><canvas></canvas><figcaption><span>01</span>edit missed</figcaption></figure>
+          <figure class="panel sig" data-signal="retry"><canvas></canvas><figcaption><span>02</span>same call twice</figcaption></figure>
+          <figure class="panel sig" data-signal="reread"><canvas></canvas><figcaption><span>03</span>re-read a file</figcaption></figure>
+          <figure class="panel sig" data-signal="error"><canvas></canvas><figcaption><span>04</span>tool error</figcaption></figure>
+          <figure class="panel sig" data-signal="sorry"><canvas></canvas><figcaption><span>05</span>"sorry, let me fix that"</figcaption></figure>
+          <div class="panel panel-outro">
+            <h2 class="h-big">At every <em>fill</em> level.</h2>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ─── 05 factors ──────────────────────────────────────── -->
-    <section class="section factors-section" id="factors">
-      <div class="wrap">
-        <header class="section-head">
-          <p class="kicker mono" data-scramble>05 · contextrot factors</p>
-          <h2 class="display" data-split>So what <em>does</em> move it?</h2>
-          <p class="lede" data-reveal>
-            Context fill is one suspect. <code>contextrot factors</code> runs the same statistics
-            across five more and ranks what genuinely separates your good steps from your bad
-            ones. Click a row to see every group.
-          </p>
-        </header>
-        <div class="factors-layout">
-          <div class="factors-panel" data-reveal>
-            <div class="factors-toolbar">
-              <div class="seg" role="tablist" aria-label="Dataset">
-                <button role="tab" class="seg-btn" data-dataset="real" aria-selected="true">Real · 31,991 steps</button>
-                <button role="tab" class="seg-btn" data-dataset="demo" aria-selected="false">Demo dataset</button>
-              </div>
-              <p class="factors-legend mono"><span><i class="fm fm-clear"></i>clear</span><span><i class="fm fm-maybe"></i>maybe</span><span><i class="fm fm-none"></i>no effect</span></p>
-            </div>
-            <ol class="factor-list" data-factor-list></ol>
-            <p class="factors-foot mono">Association, not causation. Ordered factors compare their two ends; categories compare best against worst. Real data is one developer — models and agents there did different jobs.</p>
-          </div>
-          <aside class="clock-card" data-reveal>
-            <p class="kicker mono">time of day · real data</p>
-            <div class="clock">
-              <svg class="clock-svg" viewBox="0 0 320 320" aria-label="Failure rate by time of day"></svg>
-              <div class="clock-center">
-                <span class="clock-val" data-clock-val>5.1%</span>
-                <span class="clock-lbl mono" data-clock-lbl>night · 0–6h</span>
-              </div>
-            </div>
-            <p class="clock-note">Slips <strong>1.6×</strong> as often after midnight as in the morning. Almost certainly the human, not the model — tired prompts, riskier asks. The most actionable thing it found.</p>
-          </aside>
+    <!-- 03 · the answer (zoom, pinned) -->
+    <section class="pin pin-answer" id="answer" data-chapter="03" data-title="the answer" data-pin="answer">
+      <div class="pin-stage">
+        <p class="a-claim" data-a="0"><span class="tag">03</span>We checked<br><span class="mono-num">31,991</span> real steps.</p>
+        <div class="a-result">
+          <p class="a-big" data-a="1">No rot.</p>
+          <p class="a-line" data-a="2">Filling the window wasn't the problem.</p>
         </div>
       </div>
     </section>
 
-    <!-- ─── 06 demo terminal ────────────────────────────────── -->
-    <section class="section demo-section" id="demo">
-      <div class="wrap">
-        <header class="section-head">
-          <p class="kicker mono" data-scramble>06 · in your terminal</p>
-          <h2 class="display" data-split>The answer first. <em>Then the detail.</em></h2>
-          <p class="lede" data-reveal>
-            A verdict, the one or two facts behind it, and what to change. A live meter for your
-            status bar, coloured against <em>your</em> curve — not a generic 70%.
-          </p>
-        </header>
-        <div class="term" data-reveal>
-          <div class="term-bar">
-            <span class="term-dots"><i></i><i></i><i></i></span>
-            <div class="term-tabs" role="tablist" aria-label="Demo">
-              <button role="tab" class="ttab" data-term="report" aria-selected="true">contextrot</button>
-              <button role="tab" class="ttab" data-term="factors" aria-selected="false">factors</button>
-              <button role="tab" class="ttab" data-term="status" aria-selected="false">status line</button>
-              <button role="tab" class="ttab" data-term="water" aria-selected="false">water</button>
-            </div>
-            <span class="term-note mono">demo dataset</span>
+    <!-- 04 · what does move it (horizontal, moving right) -->
+    <section class="hs" id="factors" data-chapter="04" data-title="what was" data-hs="right">
+      <div class="hs-stage">
+        <div class="hs-track">
+          <div class="panel panel-intro">
+            <p class="tag">04</p>
+            <h2 class="h-big">So what <em>was?</em></h2>
+            <p class="hint">← scroll</p>
           </div>
-          <div class="term-screen mono" data-term-screen aria-live="off"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ─── 07 water ────────────────────────────────────────── -->
-    <section class="section water-section" id="water">
-      <canvas class="pool" aria-hidden="true"></canvas>
-      <div class="wrap water-inner">
-        <p class="kicker mono" data-scramble>07 · contextrot water</p>
-        <h2 class="display" data-split>And how much <em>water</em> did it drink?</h2>
-        <p class="lede" data-reveal>
-          Datacenters evaporate water to stay cool; power stations consume more. Your token
-          counts convert into litres — mostly cache reads, not the answers people assume.
-          The one figure contextrot <em>estimates</em>, and it always says so: derivation
-          included, ±2×.
-        </p>
-        <div class="water-stats" data-reveal>
-          <div><span class="ws-num"><span data-count="57.1" data-decimals="1">0</span> L</span><span class="ws-lbl mono">demo dataset, 84 sessions</span></div>
-          <div><span class="ws-num"><span data-count="89">0</span>%</span><span class="ws-lbl mono">from cache reads</span></div>
-          <div><span class="ws-num"><span data-count="2.88" data-decimals="2">0</span> mL</span><span class="ws-lbl mono">per Wh, cooling + generation</span></div>
-        </div>
-        <p class="water-hint mono" aria-hidden="true">click the water ↓</p>
-      </div>
-    </section>
-
-    <!-- ─── 08 share ────────────────────────────────────────── -->
-    <section class="section share-section" id="share">
-      <div class="wrap">
-        <header class="section-head">
-          <p class="kicker mono" data-scramble>08 · contextrot share</p>
-          <h2 class="display" data-split>Nobody knows what rot looks like <em>across people.</em></h2>
-          <p class="lede" data-reveal>
-            Because nobody has had the data. <code>contextrot share --copy</code> puts your curve on
-            your clipboard as anonymized numbers — and <strong>sends nothing</strong>. You read it,
-            then paste it into an issue. Clean curves count as much as rotten ones.
-          </p>
-        </header>
-        <div class="share-layout">
-          <div class="share-json" data-reveal>
-            <div class="sj-head mono"><span>$ contextrot share --copy</span><span class="sj-scan-label" data-scan-label>scanning…</span></div>
-            <pre class="sj-pre mono" data-share-json></pre>
-            <div class="sj-scan" aria-hidden="true"></div>
+          <div class="panel fac" data-k="night">
+            <p class="fac-x">1.6<small>×</small></p>
+            <p class="fac-name">late nights</p>
+            <div class="bars"><span class="bar bad" style="--v:.51"><b>5.1%</b> 0–6h</span><span class="bar good" style="--v:.32"><b>3.2%</b> 6–12h</span></div>
           </div>
-          <div class="share-side" data-reveal>
-            <ul class="checks mono" data-checks>
-              <li><i></i>no project names</li>
-              <li><i></i>no file paths</li>
-              <li><i></i>no prompts or code</li>
-              <li><i></i>no timestamps or costs</li>
-              <li><i></i>private model names pooled as "other"</li>
-              <li><i></i>zero network calls — you paste it yourself</li>
-            </ul>
-            <div class="waffle-card">
-              <div class="waffle" data-waffle aria-label="Curves shared so far"></div>
-              <p class="waffle-cap mono"><span class="lit-swatch"></span><span data-waffle-cap>1 curve so far — the maintainer's. The next one could be yours.</span></p>
-            </div>
-            <a class="btn-primary" href="https://github.com/Priyanshu-byte-coder/contextrot/issues/new?template=share_your_curve.yml" data-magnetic>Share your curve <span aria-hidden="true">→</span></a>
+          <div class="panel fac" data-k="agent">
+            <p class="fac-x">4.5<small>×</small></p>
+            <p class="fac-name">which agent CLI<sup>*</sup></p>
+            <div class="bars"><span class="bar bad" style="--v:1"><b>14.8%</b> opencode</span><span class="bar good" style="--v:.22"><b>3.3%</b> claude code</span></div>
+          </div>
+          <div class="panel fac" data-k="model">
+            <p class="fac-x">8.5<small>×</small></p>
+            <p class="fac-name">which model<sup>*</sup></p>
+            <div class="bars"><span class="bar bad" style="--v:1"><b>22%</b> worst</span><span class="bar good" style="--v:.12"><b>2.6%</b> best</span></div>
+          </div>
+          <div class="panel fac flat">
+            <p class="fac-x">1.0<small>×</small></p>
+            <p class="fac-name">mistakes piling up</p>
+            <p class="fac-none">no effect</p>
+          </div>
+          <div class="panel fac flat">
+            <p class="fac-x">1.0<small>×</small></p>
+            <p class="fac-name">long solo runs</p>
+            <p class="fac-none">no effect</p>
+          </div>
+          <div class="panel panel-outro">
+            <h2 class="h-big">Yours will be<br><em>different.</em></h2>
+            <p class="fine">* different tasks · association, not causation</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ─── 09 install ──────────────────────────────────────── -->
-    <section class="section install-section" id="install">
-      <div class="wrap install-inner">
-        <p class="kicker mono" data-scramble>09 · find out</p>
-        <h2 class="display install-title" data-split>Your sessions are <em>already</em> on disk.</h2>
-        <button class="cmd cmd-xl" data-copy="uvx contextrot" data-magnetic aria-label="Copy the command uvx contextrot">
-          <span class="cmd-prompt">$</span>
-          <span class="cmd-text">uvx contextrot</span>
-          <span class="cmd-copy" aria-hidden="true"><span class="cc-idle">copy</span><span class="cc-done">copied</span></span>
+    <!-- 05 · run it -->
+    <section class="sec run" id="run" data-chapter="05" data-title="run it">
+      <h2 class="h-big center" data-split>Find out in <em>seconds.</em></h2>
+      <div class="term" data-reveal>
+        <div class="term-bar">
+          <span class="term-dots"><i></i><i></i><i></i></span>
+          <div class="term-tabs" role="tablist" aria-label="Demo">
+            <button role="tab" class="ttab" data-term="report" aria-selected="true">report</button>
+            <button role="tab" class="ttab" data-term="status" aria-selected="false">live meter</button>
+            <button role="tab" class="ttab" data-term="water" aria-selected="false">water</button>
+          </div>
+          <span class="term-note">demo data</span>
+        </div>
+        <div class="term-screen" data-term-screen></div>
+      </div>
+    </section>
+
+    <!-- 06 · share -->
+    <section class="sec share" id="share" data-chapter="06" data-title="share">
+      <div class="waffle" data-waffle aria-hidden="true"></div>
+      <div class="share-copy">
+        <h2 class="h-big" data-split><span class="mono-num">1</span> curve shared. <em>Add yours.</em></h2>
+        <p class="share-sub" data-reveal>Anonymous numbers, copied to your clipboard. Nothing is sent.</p>
+        <button class="cmd" data-copy="contextrot share --copy" data-magnetic data-reveal aria-label="Copy: contextrot share --copy">
+          <span class="cmd-p">$</span> contextrot share --copy <span class="cmd-c"><span class="c1">copy</span><span class="c2">copied</span></span>
         </button>
-        <p class="install-alt mono">or <button class="inline-copy" data-copy="pip install contextrot">pip install contextrot</button> · Python 3.9+ · MIT</p>
-        <ol class="next-steps" data-reveal>
-          <li><span class="ns-n mono">1</span><div><code>contextrot factors</code><p>What actually moves your failure rate.</p></div></li>
-          <li><span class="ns-n mono">2</span><div><code>contextrot install statusline --apply</code><p>A live meter in Claude Code, coloured by your curve.</p></div></li>
-          <li><span class="ns-n mono">3</span><div><code>contextrot share --copy</code><p>Add your curve to everyone's.</p></div></li>
-        </ol>
       </div>
-      <div class="marquee" aria-label="Supported agents">
-        <div class="marquee-track mono">
-          <span>Claude Code</span><span>Codex CLI</span><span>Gemini CLI</span><span>Qwen Code</span><span>OpenCode</span><span>Cline</span><span>Roo Code</span><span>Kilo Code</span>
-          <span aria-hidden="true">Claude Code</span><span aria-hidden="true">Codex CLI</span><span aria-hidden="true">Gemini CLI</span><span aria-hidden="true">Qwen Code</span><span aria-hidden="true">OpenCode</span><span aria-hidden="true">Cline</span><span aria-hidden="true">Roo Code</span><span aria-hidden="true">Kilo Code</span>
-        </div>
+    </section>
+
+    <!-- 07 · end -->
+    <section class="end" id="end" data-chapter="07" data-title="your turn">
+      <canvas class="pool" aria-hidden="true"></canvas>
+      <div class="end-copy">
+        <button class="mega" data-copy="uvx contextrot" aria-label="Copy: uvx contextrot">
+          <span class="mega-p">$</span><span class="mega-t">uvx contextrot</span>
+        </button>
+        <p class="end-sub">click to copy · Python 3.9+ · MIT · zero network calls</p>
+        <p class="agents">Claude Code · Codex · Gemini CLI · Qwen Code · OpenCode · Cline · Roo · Kilo</p>
       </div>
+      <footer class="foot">
+        <span>it counts the water too — click it</span>
+        <nav aria-label="Links">
+          <a href="https://github.com/Priyanshu-byte-coder/contextrot">GitHub</a>
+          <a href="https://pypi.org/project/contextrot/">PyPI</a>
+          <a href="https://github.com/Priyanshu-byte-coder/contextrot/blob/main/docs/guide.md">Guide</a>
+          <a href="https://github.com/Priyanshu-byte-coder/contextrot/blob/main/docs/methodology.md">Method</a>
+        </nav>
+        <span>this page loads nothing from anyone else</span>
+      </footer>
     </section>
   </main>
 
-  <footer class="footer">
-    <div class="wrap footer-inner">
-      <p class="footer-privacy">This page loads nothing from anyone else — no analytics, no font CDN, no trackers. <em>Neither does contextrot.</em></p>
-      <nav class="footer-links mono" aria-label="Project links">
-        <a href="https://github.com/Priyanshu-byte-coder/contextrot">GitHub</a>
-        <a href="https://pypi.org/project/contextrot/">PyPI</a>
-        <a href="https://github.com/Priyanshu-byte-coder/contextrot/blob/main/docs/guide.md">Guide</a>
-        <a href="https://github.com/Priyanshu-byte-coder/contextrot/blob/main/docs/methodology.md">Methodology</a>
-        <a href="https://github.com/Priyanshu-byte-coder/contextrot/blob/main/CHANGELOG.md">Changelog</a>
-      </nav>
-      <p class="footer-fine mono">contextrot 2.0 · MIT · made by <a href="https://github.com/Priyanshu-byte-coder">Priyanshu</a></p>
-    </div>
-    <div class="footer-word" aria-hidden="true">context<span>rot</span></div>
-  </footer>
-
-  <div class="toast mono" role="status" aria-live="polite"></div>
+  <div class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

@@ -24,9 +24,10 @@ class Pix {
     this.c.width = Math.round(r.width * dpr);
     this.c.height = Math.round(r.height * dpr);
     this.x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.cell = 10;
+    // a fixed 17-row stage, as large as the canvas allows
+    this.cell = Math.max(8, Math.floor(Math.min(this.h / 17, this.w / 32)));
     this.cols = Math.floor(this.w / this.cell);
-    this.rows = Math.floor(this.h / this.cell);
+    this.rows = 17;
     this.ox = Math.round((this.w - this.cols * this.cell) / 2);
     this.oy = Math.round((this.h - this.rows * this.cell) / 2);
     this.left = Math.max(2, Math.round(this.cols * 0.1));
@@ -141,10 +142,10 @@ const STORIES = {
     if (s1 > 0 && s1 < 1) bar(pos1, "rgba(122,165,255,0.35)", 1);
     if (s2 > 0 && s2 < 1) bar(pos2, "rgba(255,59,74,0.4)", 1);
     if (t > 1.7 && t < 3.3) {
-      p.x.font = "600 11px 'JetBrains Mono', monospace";
+      p.x.font = `${Math.round(p.cell * 1.3)}px Departure, monospace`;
       p.x.fillStyle = RED;
       p.x.globalAlpha = clamp((t - 1.7) * 4) * clamp((3.3 - t) * 4);
-      p.x.fillText("again ↻", p.w - p.ox - p.left * p.cell - 52, p.oy + 1.6 * p.cell);
+      p.x.fillText("again", p.w - p.ox - p.left * p.cell - p.x.measureText("again").width, p.oy + 1.6 * p.cell);
       p.x.globalAlpha = 1;
     }
   },
@@ -179,7 +180,7 @@ const STORIES = {
         p.x.globalAlpha = 1;
       }
       if (lt > 0.3 && lt < 1.9) {
-        p.x.font = "600 11px 'JetBrains Mono', monospace";
+        p.x.font = `${Math.round(p.cell * 1.3)}px Departure, monospace`;
         p.x.fillStyle = RED;
         p.x.globalAlpha = clamp((lt - 0.3) * 4) * clamp((1.9 - lt) * 4);
         p.x.fillText("exit 1 · no such file", p.ox + L * p.cell, p.oy + (row + 3) * p.cell);
@@ -191,7 +192,7 @@ const STORIES = {
   sorry(p, t) {
     const T = 5.2; t %= T;
     const x = p.x, L = p.ox + p.left * p.cell;
-    x.font = "500 12.5px 'JetBrains Mono', monospace";
+    x.font = `${Math.round(p.cell * 1.45)}px Departure, monospace`;
     x.textBaseline = "middle";
     const y1 = p.h * 0.36, y2 = p.h * 0.62;
     const a = "✓ Done — all tests pass.";
