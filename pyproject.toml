@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "contextrot"
-version = "2.0.0"
+version = "2.1.0"
 description = "Does your coding agent get worse as its context fills? Measure it on your own sessions — and find what actually moves its failure rate."
 readme = "README.md"
 license = { text = "MIT" }

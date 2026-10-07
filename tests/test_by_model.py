@@ -21,6 +21,8 @@ from contextrot.signals import StepSignals
         ("claude-haiku-4-5-20251001", "haiku-4.5"),
         ("claude-sonnet-4-5-latest", "sonnet-4.5"),
         ("CLAUDE-OPUS-4-8", "opus-4.8"),
+        # Antigravity hosts Claude under a "-thinking" variant id.
+        ("claude-opus-4-6-thinking", "opus-4.6"),
         # Fable and Mythos are priced with 1M windows in pricing.py; they must
         # group as Anthropic families too, not fall through to "unknown".
         ("claude-fable-5", "fable-5"),

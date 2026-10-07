@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextrot.adapters.antigravity import AntigravityAdapter
 from contextrot.adapters.base import SessionAdapter
 from contextrot.adapters.claude_code import ClaudeCodeAdapter
 from contextrot.adapters.cline import ClineAdapter
@@ -15,10 +16,12 @@ ADAPTERS: dict[str, SessionAdapter] = {
     CodexAdapter.name: CodexAdapter(),
     GeminiCliAdapter.name: GeminiCliAdapter(),
     ClineAdapter.name: ClineAdapter(),
+    AntigravityAdapter.name: AntigravityAdapter(),
 }
 
 __all__ = [
     "ADAPTERS",
+    "AntigravityAdapter",
     "ClaudeCodeAdapter",
     "ClineAdapter",
     "CodexAdapter",

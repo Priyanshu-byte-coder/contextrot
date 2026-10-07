@@ -4,6 +4,28 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning follows
 [SemVer](https://semver.org/).
 
+## [2.1.0] - 2026-10-07
+
+### Added
+
+- **Google Antigravity, CLI and IDE.** Antigravity — which Google is moving Gemini CLI
+  users onto — wasn't read at all, so a heavy Antigravity user's share showed none of it.
+  It keeps each conversation as an undocumented SQLite database of protobuf blobs under
+  `~/.gemini/antigravity-cli/` and `~/.gemini/antigravity-ide/`. The token usage per
+  model call, the model, tool calls with their arguments, errors and command exit codes
+  were decoded from real databases and checked against the plain-text transcripts
+  Antigravity writes for some conversations (which carry no token counts themselves).
+  Both Gemini and Claude models running inside Antigravity are recognised. Reading needs
+  nothing beyond the standard library.
+- **`doctor` reports data it can't read.** Older Antigravity versions saved encrypted
+  `.pb` conversations; `doctor` now says how many it found rather than leaving a gap
+  unexplained.
+
+### Fixed
+
+- `claude-opus-4-6-thinking` (Antigravity's id for Opus 4.6) grouped as plain "Opus"
+  instead of "Opus 4.6".
+
 ## [2.0.0] - 2026-10-04
 
 The question changes. contextrot used to start from the claim that agents get worse as

@@ -305,6 +305,13 @@ short window: try `contextrot --days 0`.
 
 **Your transcripts live somewhere unusual.** Point at them with `--data-dir`.
 
+**Antigravity shows fewer sessions than you used.** contextrot reads Antigravity's
+conversation databases in `~/.gemini/antigravity-cli/` and `~/.gemini/antigravity-ide/`.
+Older Antigravity versions saved conversations as encrypted `.pb` files, which can't be
+read; `contextrot doctor` says how many it found. Antigravity also compacts its own
+context long before the model's window is full, so its sessions rarely count as "deep" —
+expect its verdict to say so.
+
 **The numbers look wrong.** Please [open a bug](https://github.com/Priyanshu-byte-coder/contextrot/issues/new?template=bug_report.yml)
 with the output of `contextrot doctor` — it answers most questions on its own.
 

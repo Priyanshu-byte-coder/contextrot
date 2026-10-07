@@ -31,6 +31,8 @@ _AGENT_LABELS = {
     "cline": "Cline",
     "roo-code": "Roo Code",
     "kilo-code": "Kilo Code",
+    "antigravity": "Antigravity",
+    "antigravity-cli": "Antigravity CLI",
 }
 
 

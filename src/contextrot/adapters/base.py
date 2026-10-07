@@ -26,3 +26,12 @@ class SessionAdapter(ABC):
     @abstractmethod
     def parse(self, path: Path) -> Session | None:
         """Parse one transcript file. Return None if it holds no usable steps."""
+
+    def unreadable_note(self, data_dir: Path | None = None) -> str | None:
+        """One line on data this agent left that can't be read, for `doctor`.
+
+        Most adapters read everything they find. The exception is an agent that
+        changed format, leaving older sessions in a form that can't be parsed:
+        saying so beats a verdict that silently ignores half someone's history.
+        """
+        return None

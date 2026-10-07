@@ -39,7 +39,8 @@ from contextrot.models import Session
 # Covers each supported agent's native names: Claude Code (Edit/Write),
 # OpenCode (edit/write), Codex (apply_patch), Gemini CLI/Qwen Code
 # (replace/write_file/edit), Cline/Roo Code/Kilo Code (replace_in_file/
-# write_to_file/apply_diff/...).
+# write_to_file/apply_diff/...), Antigravity (replace_file_content/
+# multi_replace_file_content/write_to_file, view_file).
 EDIT_TOOLS = {
     "edit",
     "write",
@@ -56,8 +57,10 @@ EDIT_TOOLS = {
     "insert_content",
     "search_and_replace",
     "edit_file",
+    "replace_file_content",
+    "multi_replace_file_content",
 }
-READ_TOOLS = {"read", "notebookread", "read_file", "read_many_files"}
+READ_TOOLS = {"read", "notebookread", "read_file", "read_many_files", "view_file"}
 
 _SELF_CORRECTION = re.compile(
     r"\b("

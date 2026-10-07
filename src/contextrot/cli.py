@@ -1246,6 +1246,13 @@ def doctor(
         return table
 
     anim.rows(console, _table, probed, animate=_animate())
+    for adapter in ADAPTERS.values():
+        try:
+            note = adapter.unreadable_note(data_dir)
+        except Exception:  # noqa: BLE001 — doctor must never crash
+            note = None
+        if note:
+            console.print(f"[dim]  note: {note}[/dim]")
     console.print()
 
     if not found_any:
@@ -1333,6 +1340,7 @@ def _search_hint(agent: str, data_dir: Optional[Path]) -> str:
         "codex": "~/.codex/sessions",
         "gemini-cli": "~/.gemini/tmp, ~/.qwen/tmp",
         "cline": "VS Code globalStorage (Cline/Roo/Kilo)",
+        "antigravity": "~/.gemini/antigravity-cli, ~/.gemini/antigravity-ide",
     }
     return hints.get(agent, "default location")
 

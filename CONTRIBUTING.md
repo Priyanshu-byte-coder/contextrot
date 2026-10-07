@@ -24,7 +24,7 @@ Adapter ground rules:
 
 Already shipped: Claude Code, Codex CLI, Gemini CLI, Qwen Code, OpenCode, Cline/Roo/Kilo Code.
 
-Wanted: OpenClaw, Cursor CLI, Antigravity, Amp, OpenTelemetry GenAI spans.
+Wanted: OpenClaw, Cursor CLI, Amp, OpenTelemetry GenAI spans.
 
 ## Other contributions
 

@@ -122,7 +122,7 @@ each screen.
 |---|---|
 | Claude Code · Codex CLI · Gemini CLI · Qwen Code · OpenCode | ✅ |
 | Cline · Roo Code · Kilo Code (VS Code) | ✅ |
-| Google Antigravity | 🔬 investigating |
+| Google Antigravity — CLI and IDE | ✅ conversations since it moved to SQLite; older encrypted ones are reported, not read |
 | Cursor · Windsurf · Kiro | ⚠️ their local files don't record per-message token counts |
 
 Adding an agent is one small file with a fixture and a test —

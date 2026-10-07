@@ -17,6 +17,7 @@ _SUFFIX_RES = (
     re.compile(r"-v\d+:\d+$"),  # bedrock "-v1:0"
     re.compile(r"\[\dm\]$"),  # "[1m]" long-context marker
     re.compile(r"-latest$"),
+    re.compile(r"-thinking$"),  # Antigravity's "claude-opus-4-6-thinking"
     re.compile(r"-\d{8}$"),  # trailing date "-20241022"
 )
 # Anthropic families. Keep in step with the families priced in pricing.py —
