@@ -24,7 +24,11 @@ Adapter ground rules:
 
 Already shipped: Claude Code, Codex CLI, Gemini CLI, Qwen Code, OpenCode, Cline/Roo/Kilo Code.
 
-Wanted: OpenClaw, Cursor CLI, Amp, OpenTelemetry GenAI spans.
+Wanted: OpenClaw, Cursor CLI, Goose, OpenTelemetry GenAI spans.
+
+Amp dropped off this list: as of its 2026-03-31 build it stores threads
+server-side on `ampcode.com` instead of writing them to disk, so there is
+no local file left for a no-network adapter to read.
 
 ## Other contributions
 
